@@ -97,6 +97,29 @@ export async function getIssueSummary(client: RedmineClient, id: number): Promis
   return data.issue;
 }
 
+export type IssueJournal = NonNullable<Issue["journals"]>[number];
+
+/**
+ * Только история изменений задачи (без остальных include) - для ленты
+ * активности на дашборде (useActivityFeed), где нужны journals по нескольким
+ * задачам сразу и лишние include (attachments, relations, watchers...)
+ * только увеличили бы вес запроса без пользы.
+ */
+export async function getIssueJournal(
+  client: RedmineClient,
+  id: number,
+): Promise<{ issue: IssueSummary; journals: IssueJournal[] }> {
+  const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
+    params: { path: { format: "json", issue_id: id }, query: { include: ["journals"] } },
+  });
+
+  if (error || !data) {
+    throw new Error(`Не удалось загрузить историю задачи #${id}.`);
+  }
+
+  return { issue: data.issue, journals: data.issue.journals ?? [] };
+}
+
 /**
  * Поля, общие для создания и правки задачи - см. IssueFormFields
  * (src/components/issues/IssueFormFields.tsx), который редактирует именно

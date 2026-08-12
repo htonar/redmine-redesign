@@ -43,40 +43,14 @@ import {
   type Attachment,
 } from "@/api/attachments";
 import { addWatcher, removeWatcher } from "@/api/watchers";
+import { JournalEntry } from "@/components/issues/JournalEntry";
 import {
   RELATION_TYPE_INVERSE,
   RELATION_TYPE_LABELS,
   RELATION_TYPE_OPTIONS,
 } from "@/lib/issue-relations";
+import { formatDateTime } from "@/lib/journal-format";
 import { formatFileSize } from "@/lib/utils";
-
-/** Человекочитаемые подписи для самых частых полей в истории изменений (journal.details). */
-const FIELD_LABELS: Record<string, string> = {
-  status_id: "Статус",
-  assigned_to_id: "Исполнитель",
-  priority_id: "Приоритет",
-  subject: "Тема",
-  description: "Описание",
-  done_ratio: "Готовность",
-  fixed_version_id: "Версия",
-  category_id: "Категория",
-  start_date: "Дата начала",
-  due_date: "Срок",
-  estimated_hours: "Оценка часов",
-  tracker_id: "Трекер",
-  project_id: "Проект",
-  is_private: "Приватность",
-};
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", {
@@ -142,27 +116,6 @@ function diffFormValues(initial: IssueFormValues, current: IssueFormValues): Iss
     patch.description = current.description || null;
   }
   return patch;
-}
-
-function JournalEntry({ journal }: { journal: NonNullable<Issue["journals"]>[number] }) {
-  return (
-    <div className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{journal.user?.name ?? "Кто-то"}</span>
-        {formatDateTime(journal.created_on)}
-      </div>
-      {journal.notes && <p className="text-sm whitespace-pre-wrap">{journal.notes}</p>}
-      {journal.details.length > 0 && (
-        <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-          {journal.details.map((d, i) => (
-            <li key={i}>
-              {FIELD_LABELS[d.name] ?? d.name}: {d.old_value ?? "—"} → {d.new_value ?? "—"}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 /**
