@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Paperclip, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2, Paperclip, Pencil, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +42,7 @@ import {
   uploadAttachment,
   type Attachment,
 } from "@/api/attachments";
+import { addWatcher, removeWatcher } from "@/api/watchers";
 import {
   RELATION_TYPE_INVERSE,
   RELATION_TYPE_LABELS,
@@ -231,6 +232,12 @@ export function IssueDetailPage() {
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
   const [removingAttachmentId, setRemovingAttachmentId] = useState<number | null>(null);
 
+  const [watcherInput, setWatcherInput] = useState("");
+  const [isAddingWatcher, setIsAddingWatcher] = useState(false);
+  const [watcherError, setWatcherError] = useState<string | null>(null);
+  const [removingWatcherId, setRemovingWatcherId] = useState<number | null>(null);
+  const [isTogglingSelfWatch, setIsTogglingSelfWatch] = useState(false);
+
   function handleStartEdit() {
     if (!issue) return;
     const values = issueToFormValues(issue);
@@ -398,6 +405,53 @@ export function IssueDetailPage() {
       setAttachmentError(e instanceof Error ? e.message : "Не удалось удалить файл.");
     } finally {
       setRemovingAttachmentId(null);
+    }
+  }
+
+  async function handleAddWatcher(userId: number) {
+    if (!client || !issue) return;
+    setWatcherError(null);
+    setIsAddingWatcher(true);
+    try {
+      await addWatcher(client, issue.id, userId);
+      setWatcherInput("");
+      reload();
+    } catch (e) {
+      setWatcherError(e instanceof Error ? e.message : "Не удалось добавить наблюдателя.");
+    } finally {
+      setIsAddingWatcher(false);
+    }
+  }
+
+  async function handleRemoveWatcher(userId: number) {
+    if (!client || !issue) return;
+    setWatcherError(null);
+    setRemovingWatcherId(userId);
+    try {
+      await removeWatcher(client, issue.id, userId);
+      reload();
+    } catch (e) {
+      setWatcherError(e instanceof Error ? e.message : "Не удалось убрать наблюдателя.");
+    } finally {
+      setRemovingWatcherId(null);
+    }
+  }
+
+  async function handleToggleSelfWatch(isWatching: boolean) {
+    if (!client || !issue || !user) return;
+    setWatcherError(null);
+    setIsTogglingSelfWatch(true);
+    try {
+      if (isWatching) {
+        await removeWatcher(client, issue.id, user.id);
+      } else {
+        await addWatcher(client, issue.id, user.id);
+      }
+      reload();
+    } catch (e) {
+      setWatcherError(e instanceof Error ? e.message : "Не удалось изменить подписку.");
+    } finally {
+      setIsTogglingSelfWatch(false);
     }
   }
 
@@ -885,6 +939,89 @@ export function IssueDetailPage() {
                   <p className="mt-1 text-xs text-destructive">{attachmentError}</p>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex items-center justify-between border-b">
+              <CardTitle>Наблюдатели</CardTitle>
+              {user &&
+                (() => {
+                  const isSelfWatching = issue.watchers?.some((w) => w.id === user.id) ?? false;
+                  return (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => handleToggleSelfWatch(isSelfWatching)}
+                      disabled={isTogglingSelfWatch}
+                    >
+                      {isTogglingSelfWatch ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : isSelfWatching ? (
+                        <EyeOff className="size-3.5" />
+                      ) : (
+                        <Eye className="size-3.5" />
+                      )}
+                      {isSelfWatching ? "Не наблюдать" : "Наблюдать"}
+                    </Button>
+                  );
+                })()}
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {issue.watchers && issue.watchers.length > 0 ? (
+                <ul className="flex flex-col gap-1.5">
+                  {issue.watchers.map((w) => (
+                    <li key={w.id} className="flex items-center justify-between gap-2">
+                      <span className="text-sm">{w.name}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemoveWatcher(w.id)}
+                        disabled={removingWatcherId === w.id}
+                        aria-label="Убрать наблюдателя"
+                      >
+                        {removingWatcherId === w.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <X className="size-3.5" />
+                        )}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Нет</p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={watcherInput} onValueChange={setWatcherInput}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue placeholder="Участник проекта" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members
+                      .filter((m) => !issue.watchers?.some((w) => w.id === m.id))
+                      .map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => handleAddWatcher(Number(watcherInput))}
+                  disabled={!watcherInput || isAddingWatcher}
+                >
+                  {isAddingWatcher && <Loader2 className="size-3.5 animate-spin" />}
+                  <Plus className="size-3.5" />
+                  Добавить наблюдателя
+                </Button>
+              </div>
+              {watcherError && <p className="text-xs text-destructive">{watcherError}</p>}
             </CardContent>
           </Card>
 

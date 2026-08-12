@@ -60,7 +60,16 @@ export async function getIssue(client: RedmineClient, id: number): Promise<Issue
   const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
     params: {
       path: { format: "json", issue_id: id },
-      query: { include: ["journals", "allowed_statuses", "children", "relations", "attachments"] },
+      query: {
+        include: [
+          "journals",
+          "allowed_statuses",
+          "children",
+          "relations",
+          "attachments",
+          "watchers",
+        ],
+      },
     },
   });
 
