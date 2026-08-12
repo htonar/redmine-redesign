@@ -9,6 +9,7 @@ export interface AppShellProps extends PropsWithChildren {
   currentProject: string
   onProjectChange: (project: string) => void
   user: CurrentUser
+  onLogout: () => void
 }
 
 /** Общий каркас: тёмный сайдбар слева + топ-бар и контент справа. */
@@ -20,6 +21,7 @@ export function AppShell({
   currentProject,
   onProjectChange,
   user,
+  onLogout,
 }: AppShellProps) {
   return (
     <div className="flex h-svh bg-background text-foreground">
@@ -30,6 +32,7 @@ export function AppShell({
           currentProject={currentProject}
           onProjectChange={onProjectChange}
           user={user}
+          onLogout={onLogout}
         />
         <main className="flex-1 overflow-auto bg-muted/40 p-6">
           {children}

@@ -19,6 +19,7 @@ export interface TopbarProps {
   currentProject: string
   onProjectChange: (project: string) => void
   user: CurrentUser
+  onLogout: () => void
 }
 
 /** Верхняя панель рабочей области: поиск, переключатель проекта, пользователь. */
@@ -27,6 +28,7 @@ export function Topbar({
   currentProject,
   onProjectChange,
   user,
+  onLogout,
 }: TopbarProps) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4">
@@ -72,7 +74,9 @@ export function Topbar({
           <DropdownMenuContent align="end">
             <DropdownMenuItem>Профиль</DropdownMenuItem>
             <DropdownMenuItem>Настройки</DropdownMenuItem>
-            <DropdownMenuItem variant="destructive">Выйти</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onSelect={onLogout}>
+              Выйти
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

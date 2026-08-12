@@ -64,7 +64,12 @@ docs/design.md             # дизайн-язык, палитра, компон
   палитру из `docs/design.md` (`src/index.css`), алиас `@/*` -> `src/*`
 - [x] Базовые layout-компоненты: `Sidebar`, `Topbar`, `AppShell`
   (`src/components/layout/`), `StatCard` (`src/components/StatCard.tsx`)
-- [ ] Экран логина (только API-ключ, с валидацией через `GET /my/account.json`)
+- [x] Экран логина (только API-ключ, валидация через `GET /my/account.json`).
+  `AuthProvider`/`useAuth` (`src/contexts/AuthContext.tsx`) - хранит сессию в
+  localStorage (`src/lib/auth-storage.ts`), при старте тихо проверяет
+  сохраненный ключ и разлогинивает, если он больше не работает. Сетевые ошибки
+  (недоступный хост/CORS) и 401 показываются пользователю разными сообщениями -
+  см. `fetchAccount` в `AuthContext.tsx`.
 - [ ] Роутинг между разделами (react-router и т.п. пока не выбран - `App.tsx`
   сейчас переключает разделы через локальный state)
 - [ ] **Список задач с фильтрами/сортировкой/сохраненными видами** - ежедневный

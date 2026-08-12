@@ -19,7 +19,7 @@ export interface RedmineClientOptions {
 /**
  * Creates a typed Redmine REST API client based on the generated OpenAPI schema.
  * The schema is generated from https://github.com/d-yoshi/redmine-openapi via
- * `npm run api:generate` — see api/redmine-openapi.yaml.
+ * `npm run api:generate` - see api/redmine-openapi.yaml.
  */
 export function createRedmineClient({ baseUrl, auth }: RedmineClientOptions) {
   const client = createClient<paths>({ baseUrl });
