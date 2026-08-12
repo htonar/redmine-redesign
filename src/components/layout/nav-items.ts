@@ -21,11 +21,11 @@ export interface NavItem {
  * (files-модуль) и "Цели" (не сущность Redmine вообще, декоративный пункт
  * исходного макета) сознательно убраны - фокус на разработчике, который
  * заводит задачи и трекает время, а не на паритете со всеми модулями
- * нативного Redmine. "Профиль" и "Отчеты" остаются в бэклоге, но не в
- * приоритете - см. CLAUDE.md.
+ * нативного Redmine. "Отчеты" остаются в бэклоге, но не в приоритете - см.
+ * CLAUDE.md.
  */
 export const navItems: NavItem[] = [
-  { id: 'profile', label: 'Профиль', icon: User },
+  { id: 'profile', label: 'Профиль', icon: User, path: '/profile' },
   { id: 'time', label: 'Учет времени', icon: Clock, path: '/time' },
   { id: 'activity', label: 'Активность', icon: BarChart3, path: '/dashboard' },
   { id: 'tasks', label: 'Задачи', icon: PencilLine, path: '/issues' },

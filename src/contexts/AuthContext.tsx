@@ -35,6 +35,8 @@ interface AuthContextValue {
   error: string | null;
   login: (baseUrl: string, apiKey: string) => Promise<void>;
   logout: () => void;
+  /** Перечитывает /my/account.json - вызывать после правки профиля, чтобы имя в Topbar обновилось. */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -158,9 +160,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setStatus("anonymous");
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    if (!client) return;
+    const account = await fetchAccount(client);
+    setUser(account);
+  }, [client]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, client, baseUrl, error, login, logout }),
-    [status, user, client, baseUrl, error, login, logout],
+    () => ({ status, user, client, baseUrl, error, login, logout, refreshUser }),
+    [status, user, client, baseUrl, error, login, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
