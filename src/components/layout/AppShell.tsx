@@ -1,35 +1,31 @@
 import type { PropsWithChildren } from 'react'
 import { Sidebar } from './Sidebar'
-import { Topbar, type CurrentUser } from './Topbar'
+import { Topbar, type CurrentUser, type TopbarProps } from './Topbar'
 
-export interface AppShellProps extends PropsWithChildren {
-  activeNavId: string
-  onNavigate: (id: string) => void
-  projects: string[]
-  currentProject: string
-  onProjectChange: (project: string) => void
+export interface AppShellProps
+  extends PropsWithChildren,
+    Omit<TopbarProps, 'user'> {
   user: CurrentUser
-  onLogout: () => void
 }
 
-/** Общий каркас: тёмный сайдбар слева + топ-бар и контент справа. */
+/** Общий каркас: темный сайдбар слева + топ-бар и контент справа. */
 export function AppShell({
   children,
-  activeNavId,
-  onNavigate,
   projects,
-  currentProject,
+  projectsLoading,
+  selectedProjectId,
   onProjectChange,
   user,
   onLogout,
 }: AppShellProps) {
   return (
     <div className="flex h-svh bg-background text-foreground">
-      <Sidebar activeId={activeNavId} onNavigate={onNavigate} />
+      <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           projects={projects}
-          currentProject={currentProject}
+          projectsLoading={projectsLoading}
+          selectedProjectId={selectedProjectId}
           onProjectChange={onProjectChange}
           user={user}
           onLogout={onLogout}

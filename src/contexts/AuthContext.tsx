@@ -29,6 +29,8 @@ interface AuthContextValue {
   status: AuthStatus;
   user: AuthUser | null;
   client: RedmineClient | null;
+  /** Адрес текущего Redmine-инстанса - нужен, например, для ключа в localStorage. */
+  baseUrl: string | null;
   /** Ошибка последней попытки логина - null, пока не было ни одной ошибки. */
   error: string | null;
   login: (baseUrl: string, apiKey: string) => Promise<void>;
@@ -93,6 +95,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>("restoring");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [client, setClient] = useState<RedmineClient | null>(null);
+  const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,6 +115,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       .then((account) => {
         setClient(restoredClient);
         setUser(account);
+        setBaseUrl(stored.baseUrl);
         setStatus("authenticated");
       })
       .catch(() => {
@@ -137,6 +141,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       saveCredentials({ baseUrl, apiKey });
       setClient(newClient);
       setUser(account);
+      setBaseUrl(baseUrl);
       setStatus("authenticated");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось войти.");
@@ -148,13 +153,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     clearCredentials();
     setClient(null);
     setUser(null);
+    setBaseUrl(null);
     setError(null);
     setStatus("anonymous");
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, client, error, login, logout }),
-    [status, user, client, error, login, logout],
+    () => ({ status, user, client, baseUrl, error, login, logout }),
+    [status, user, client, baseUrl, error, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

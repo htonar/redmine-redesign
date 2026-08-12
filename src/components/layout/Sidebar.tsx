@@ -1,4 +1,5 @@
 import { Menu } from 'lucide-react'
+import { NavLink } from 'react-router'
 import { cn } from '@/lib/utils'
 import {
   Tooltip,
@@ -7,16 +8,17 @@ import {
 } from '@/components/ui/tooltip'
 import { navItems } from './nav-items'
 
-export interface SidebarProps {
-  activeId: string
-  onNavigate: (id: string) => void
-}
+const itemClasses =
+  'flex size-10 items-center justify-center rounded-lg transition-colors'
+const inactiveClasses =
+  'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+const activeClasses = 'bg-sidebar-primary text-sidebar-primary-foreground'
 
 /**
- * Тёмный левый сайдбар с иконками разделов - см. docs/design.md.
- * Только иконки (без подписей), подпись показывается в tooltip при наведении.
+ * Темный левый сайдбар с иконками разделов - см. docs/design.md. Пункты без
+ * `path` в nav-items.ts еще не реализованы - показаны, но неактивны.
  */
-export function Sidebar({ activeId, onNavigate }: SidebarProps) {
+export function Sidebar() {
   return (
     <aside className="flex h-svh w-16 shrink-0 flex-col items-center gap-1 bg-sidebar py-3 text-sidebar-foreground">
       <button
@@ -29,27 +31,35 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
 
       <nav className="flex flex-1 flex-col items-center gap-1">
         {navItems.map((item) => {
-          const isActive = item.id === activeId
           const Icon = item.icon
           return (
             <Tooltip key={item.id}>
               <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={item.label}
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => onNavigate(item.id)}
-                  className={cn(
-                    'flex size-10 items-center justify-center rounded-lg transition-colors',
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                  )}
-                >
-                  <Icon className="size-5" />
-                </button>
+                {item.path ? (
+                  <NavLink
+                    to={item.path}
+                    aria-label={item.label}
+                    className={({ isActive }) =>
+                      cn(itemClasses, isActive ? activeClasses : inactiveClasses)
+                    }
+                  >
+                    <Icon className="size-5" />
+                  </NavLink>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={item.label}
+                    disabled
+                    className={cn(itemClasses, 'text-sidebar-foreground/30')}
+                  >
+                    <Icon className="size-5" />
+                  </button>
+                )}
               </TooltipTrigger>
-              <TooltipContent side="right">{item.label}</TooltipContent>
+              <TooltipContent side="right">
+                {item.label}
+                {!item.path && ' - скоро'}
+              </TooltipContent>
             </Tooltip>
           )
         })}

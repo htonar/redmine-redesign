@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { Project } from '@/hooks/useProjects'
 
 export interface CurrentUser {
   name: string
@@ -15,9 +16,11 @@ export interface CurrentUser {
 }
 
 export interface TopbarProps {
-  projects: string[]
-  currentProject: string
-  onProjectChange: (project: string) => void
+  projects: Project[]
+  projectsLoading: boolean
+  /** null - фильтр "Все проекты". */
+  selectedProjectId: number | null
+  onProjectChange: (projectId: number | null) => void
   user: CurrentUser
   onLogout: () => void
 }
@@ -25,11 +28,15 @@ export interface TopbarProps {
 /** Верхняя панель рабочей области: поиск, переключатель проекта, пользователь. */
 export function Topbar({
   projects,
-  currentProject,
+  projectsLoading,
+  selectedProjectId,
   onProjectChange,
   user,
   onLogout,
 }: TopbarProps) {
+  const currentProjectName =
+    projects.find((p) => p.id === selectedProjectId)?.name ?? 'Все проекты'
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4">
       <div className="relative w-full max-w-sm">
@@ -40,18 +47,26 @@ export function Topbar({
       <div className="ml-auto flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1.5">
-              {currentProject}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              disabled={projectsLoading}
+            >
+              {projectsLoading ? 'Загрузка...' : currentProjectName}
               <ChevronDown className="size-3.5 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => onProjectChange(null)}>
+              Все проекты
+            </DropdownMenuItem>
             {projects.map((project) => (
               <DropdownMenuItem
-                key={project}
-                onSelect={() => onProjectChange(project)}
+                key={project.id}
+                onSelect={() => onProjectChange(project.id)}
               >
-                {project}
+                {project.name}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
