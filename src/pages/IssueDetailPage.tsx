@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, Loader2, Paperclip, Pencil, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,10 +37,17 @@ import {
 } from "@/api/issues";
 import { createTimeEntry, type TimeEntryInput } from "@/api/timeEntries";
 import {
+  deleteAttachment,
+  downloadAttachment,
+  uploadAttachment,
+  type Attachment,
+} from "@/api/attachments";
+import {
   RELATION_TYPE_INVERSE,
   RELATION_TYPE_LABELS,
   RELATION_TYPE_OPTIONS,
 } from "@/lib/issue-relations";
+import { formatFileSize } from "@/lib/utils";
 
 /** Человекочитаемые подписи для самых частых полей в истории изменений (journal.details). */
 const FIELD_LABELS: Record<string, string> = {
@@ -218,6 +225,12 @@ export function IssueDetailPage() {
   const [relationError, setRelationError] = useState<string | null>(null);
   const [removingRelationId, setRemovingRelationId] = useState<number | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
+  const [removingAttachmentId, setRemovingAttachmentId] = useState<number | null>(null);
+
   function handleStartEdit() {
     if (!issue) return;
     const values = issueToFormValues(issue);
@@ -336,6 +349,55 @@ export function IssueDetailPage() {
       setRelationError(e instanceof Error ? e.message : "Не удалось удалить связь.");
     } finally {
       setRemovingRelationId(null);
+    }
+  }
+
+  async function handleUploadFile(file: File) {
+    if (!client || !issue) return;
+    setAttachmentError(null);
+    setIsUploadingFile(true);
+    try {
+      const uploaded = await uploadAttachment(client, file);
+      await updateIssue(client, issue.id, { uploads: [uploaded] });
+      reload();
+    } catch (e) {
+      setAttachmentError(e instanceof Error ? e.message : "Не удалось загрузить файл.");
+    } finally {
+      setIsUploadingFile(false);
+    }
+  }
+
+  function handleFileInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Сбрасываем value - иначе повторный выбор того же файла не вызовет onChange.
+    e.target.value = "";
+    if (file) void handleUploadFile(file);
+  }
+
+  async function handleDownloadAttachment(attachment: Attachment) {
+    if (!client) return;
+    setAttachmentError(null);
+    setDownloadingAttachmentId(attachment.id);
+    try {
+      await downloadAttachment(client, attachment);
+    } catch (e) {
+      setAttachmentError(e instanceof Error ? e.message : "Не удалось скачать файл.");
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  }
+
+  async function handleRemoveAttachment(attachmentId: number) {
+    if (!client) return;
+    setAttachmentError(null);
+    setRemovingAttachmentId(attachmentId);
+    try {
+      await deleteAttachment(client, attachmentId);
+      reload();
+    } catch (e) {
+      setAttachmentError(e instanceof Error ? e.message : "Не удалось удалить файл.");
+    } finally {
+      setRemovingAttachmentId(null);
     }
   }
 
@@ -749,6 +811,79 @@ export function IssueDetailPage() {
                   </Button>
                 </div>
                 {relationError && <p className="mt-1 text-xs text-destructive">{relationError}</p>}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>Вложения</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {issue.attachments && issue.attachments.length > 0 ? (
+                <ul className="flex flex-col gap-2">
+                  {issue.attachments.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                      <button
+                        type="button"
+                        className="flex min-w-0 items-center gap-1.5 text-left hover:underline disabled:opacity-50"
+                        onClick={() => handleDownloadAttachment(a)}
+                        disabled={downloadingAttachmentId === a.id}
+                      >
+                        {downloadingAttachmentId === a.id ? (
+                          <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                        ) : (
+                          <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="truncate">{a.filename}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          ({formatFileSize(a.filesize)})
+                        </span>
+                      </button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemoveAttachment(a.id)}
+                        disabled={removingAttachmentId === a.id}
+                        aria-label="Удалить файл"
+                      >
+                        {removingAttachmentId === a.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <X className="size-3.5" />
+                        )}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Нет</p>
+              )}
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileInputChange}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingFile}
+                >
+                  {isUploadingFile ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="size-3.5" />
+                  )}
+                  Прикрепить файл
+                </Button>
+                {attachmentError && (
+                  <p className="mt-1 text-xs text-destructive">{attachmentError}</p>
+                )}
               </div>
             </CardContent>
           </Card>

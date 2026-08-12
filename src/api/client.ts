@@ -52,7 +52,13 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
           `Basic ${btoa(`${auth.login}:${auth.password}`)}`,
         );
       }
-      request.headers.set("Content-Type", "application/json");
+      // Не перетираем Content-Type, если он уже явно задан вызывающим кодом
+      // (например, "application/octet-stream" при загрузке файла в
+      // uploadAttachment - src/api/attachments.ts). По умолчанию - json, как
+      // ждет большинство эндпоинтов Redmine.
+      if (!request.headers.has("Content-Type")) {
+        request.headers.set("Content-Type", "application/json");
+      }
       if (proxyUrl) {
         request.headers.set("X-Redmine-Target", baseUrl);
       }

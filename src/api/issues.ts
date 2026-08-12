@@ -60,7 +60,7 @@ export async function getIssue(client: RedmineClient, id: number): Promise<Issue
   const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
     params: {
       path: { format: "json", issue_id: id },
-      query: { include: ["journals", "allowed_statuses", "children", "relations"] },
+      query: { include: ["journals", "allowed_statuses", "children", "relations", "attachments"] },
     },
   });
 
@@ -109,6 +109,14 @@ export interface IssueFieldsInput {
   estimatedHours?: number | null;
   /** Родительская задача (подзадача чего-то) - `null` явно убирает родителя. */
   parentId?: number | null;
+  /**
+   * Новые файлы для прикрепления - сначала грузятся байты через
+   * uploadAttachment (src/api/attachments.ts, POST /uploads), затем
+   * полученный token передается сюда вместе с create/update. Удаление уже
+   * прикрепленного файла - отдельный DELETE /attachments/{id}
+   * (deleteAttachment), не через этот массив.
+   */
+  uploads?: { token: string; filename: string; contentType?: string }[];
 }
 
 export interface IssueCreateInput extends IssueFieldsInput {
@@ -139,6 +147,11 @@ export async function createIssue(
         done_ratio: input.doneRatio,
         estimated_hours: input.estimatedHours,
         parent_issue_id: input.parentId,
+        uploads: input.uploads?.map((u) => ({
+          token: u.token,
+          filename: u.filename,
+          content_type: u.contentType,
+        })),
       },
     },
   });
@@ -183,6 +196,11 @@ export async function updateIssue(
         done_ratio: input.doneRatio,
         estimated_hours: input.estimatedHours,
         parent_issue_id: input.parentId,
+        uploads: input.uploads?.map((u) => ({
+          token: u.token,
+          filename: u.filename,
+          content_type: u.contentType,
+        })),
       },
     },
   });
