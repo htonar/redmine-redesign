@@ -22,7 +22,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { id: 'profile', label: 'Профиль', icon: User },
   { id: 'messages', label: 'Сообщения', icon: Mail },
-  { id: 'time', label: 'Учет времени', icon: Clock },
+  { id: 'time', label: 'Учет времени', icon: Clock, path: '/time' },
   { id: 'activity', label: 'Активность', icon: BarChart3, path: '/dashboard' },
   { id: 'tasks', label: 'Задачи', icon: PencilLine, path: '/issues' },
   { id: 'reports', label: 'Отчеты', icon: ClipboardList },
