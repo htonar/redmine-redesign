@@ -10,6 +10,8 @@
 - **openapi-typescript + openapi-fetch** - типизированный клиент к Redmine REST API,
   сгенерированный из неофициальной OpenAPI-спеки
   ([d-yoshi/redmine-openapi](https://github.com/d-yoshi/redmine-openapi))
+- **Tailwind CSS v4 + shadcn/ui (Radix Primitives)** - UI-компоненты, тема настроена
+  под дизайн-референс (см. [`docs/design.md`](docs/design.md))
 - **oxlint** - линтер
 
 ## Документация проекта
@@ -27,6 +29,9 @@
 api/redmine-openapi.yaml   # OpenAPI-спека Redmine REST API
 src/api/schema.d.ts        # сгенерированные TS-типы (не редактировать руками)
 src/api/client.ts          # фабрика типизированного клиента
+src/components/ui/         # shadcn/ui примитивы (кнопки, dropdown, карточки...)
+src/components/layout/     # Sidebar, Topbar, AppShell
+src/index.css              # тема (токены цвета/шрифта), см. docs/design.md
 docs/                      # спека API, дизайн-документация
 ```
 

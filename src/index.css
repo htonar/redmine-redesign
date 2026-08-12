@@ -1,111 +1,190 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/geist';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Токены темы - см. docs/design.md (палитра снята с референса на Behance).
+ * primary - синий, используется для основных кнопок/CTA (как "Add task" на макетах).
+ * brand - красный, брендовый акцент Redmine: логотип, важные бейджи, destructive.
+ * cyan - вторичный акцент: графики, progress-бары, readiness-полосы.
+ * success - зелёный: положительные тренды и статусы.
+ * sidebar-* - тёмно-синяя палитра левого сайдбара, отдельная от светлого контента.
+ */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --background: #ffffff;
+  --foreground: #1b2333;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --card: #ffffff;
+  --card-foreground: #1b2333;
+  --popover: #ffffff;
+  --popover-foreground: #1b2333;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  --primary: #2f6fed;
+  --primary-foreground: #ffffff;
+
+  --secondary: #eef1f6;
+  --secondary-foreground: #1b2333;
+
+  --muted: #f7f8fb;
+  --muted-foreground: #8a93a6;
+
+  --accent: #f2f4f8;
+  --accent-foreground: #1b2333;
+
+  --destructive: #e6362c;
+  --destructive-foreground: #ffffff;
+
+  --border: #e8eaf0;
+  --input: #e8eaf0;
+  --ring: #2f6fed;
+
+  --brand: #e6362c;
+  --brand-foreground: #ffffff;
+  --cyan: #29c1e0;
+  --cyan-foreground: #0b2b33;
+  --success: #3ecf6e;
+  --success-foreground: #063d1a;
+
+  --chart-1: #29c1e0;
+  --chart-2: #2f6fed;
+  --chart-3: #3ecf6e;
+  --chart-4: #e6362c;
+  --chart-5: #8a93a6;
+
+  --radius: 0.625rem;
+
+  --sidebar: #161f38;
+  --sidebar-foreground: #eef1f8;
+  --sidebar-primary: #e6362c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #222d4f;
+  --sidebar-accent-foreground: #eef1f8;
+  --sidebar-border: #232e52;
+  --sidebar-ring: #29c1e0;
+
+  color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+/* Тёмный вариант не сверен с референсом (макеты на Behance только светлые) -
+   выведен по тем же токенам, уточнять по факту при появлении тёмных экранов. */
+.dark {
+  --background: #10162a;
+  --foreground: #eef1f8;
+
+  --card: #161f38;
+  --card-foreground: #eef1f8;
+  --popover: #161f38;
+  --popover-foreground: #eef1f8;
+
+  --primary: #4d84f5;
+  --primary-foreground: #ffffff;
+
+  --secondary: #1c2545;
+  --secondary-foreground: #eef1f8;
+
+  --muted: #1c2545;
+  --muted-foreground: #8a93a6;
+
+  --accent: #222d4f;
+  --accent-foreground: #eef1f8;
+
+  --destructive: #f0554a;
+  --destructive-foreground: #ffffff;
+
+  --border: #232e52;
+  --input: #232e52;
+  --ring: #4d84f5;
+
+  --brand: #f0554a;
+  --brand-foreground: #ffffff;
+  --cyan: #4fd1e8;
+  --cyan-foreground: #0b2b33;
+  --success: #52dd82;
+  --success-foreground: #063d1a;
+
+  --chart-1: #4fd1e8;
+  --chart-2: #4d84f5;
+  --chart-3: #52dd82;
+  --chart-4: #f0554a;
+  --chart-5: #8a93a6;
+
+  --sidebar: #0d1326;
+  --sidebar-foreground: #eef1f8;
+  --sidebar-primary: #f0554a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1c2545;
+  --sidebar-accent-foreground: #eef1f8;
+  --sidebar-border: #1c2545;
+  --sidebar-ring: #4fd1e8;
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-cyan: var(--cyan);
+  --color-cyan-foreground: var(--cyan-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  body {
+    @apply bg-background text-foreground;
   }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+  html {
+    @apply font-sans;
   }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }
