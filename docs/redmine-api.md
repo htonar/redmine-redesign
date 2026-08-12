@@ -1,6 +1,6 @@
-# Redmine REST API — спека и клиент
+# Redmine REST API - спека и клиент
 
-Источник спеки: [d-yoshi/redmine-openapi](https://github.com/d-yoshi/redmine-openapi) —
+Источник спеки: [d-yoshi/redmine-openapi](https://github.com/d-yoshi/redmine-openapi) -
 неофициальная, но живая OpenAPI 3.0.3 спецификация Redmine REST API, собранная из
 исходников и офдоков, протестирована против Redmine 7.0.0.
 
@@ -8,13 +8,13 @@
 
 Оба готовых npm-клиента (`redmine-ts`, `axios-redmine`) заброшены/deprecated, поэтому
 вместо них используется связка **openapi-typescript + openapi-fetch**: типы генерируются
-из спеки, а поверх — свой тонкий клиент.
+из спеки, а поверх - свой тонкий клиент.
 
 ## Структура
 
-- `api/redmine-openapi.yaml` — сама OpenAPI-спека (скачана из релиза `7.0.0-r2`).
-- `src/api/schema.d.ts` — сгенерированные TypeScript-типы (не редактировать руками).
-- `src/api/client.ts` — фабрика типизированного клиента с авторизацией.
+- `api/redmine-openapi.yaml` - сама OpenAPI-спека (скачана из релиза `7.0.0-r2`).
+- `src/api/schema.d.ts` - сгенерированные TypeScript-типы (не редактировать руками).
+- `src/api/client.ts` - фабрика типизированного клиента с авторизацией.
 
 ## Обновление спеки / типов
 
@@ -50,11 +50,11 @@ const { data, error } = await redmine.GET("/issues.{format}", {
 
 Поддерживается два способа (см. `RedmineAuth` в `client.ts`):
 
-- **API key** (`X-Redmine-API-Key` заголовок) — рекомендуется.
-- **HTTP Basic** (`login` + `password`) — используется, если `apiKey` не задан.
+- **API key** (`X-Redmine-API-Key` заголовок) - рекомендуется.
+- **HTTP Basic** (`login` + `password`) - используется, если `apiKey` не задан.
 
-Redmine-сервер должен быть доступен из браузера с корректными CORS-заголовками —
-это отдельная настройка на стороне Redmine (или прокси на своём бэкенде), не
+Redmine-сервер должен быть доступен из браузера с корректными CORS-заголовками -
+это отдельная настройка на стороне Redmine (или прокси на своем бэкенде), не
 покрывается фронтовым клиентом.
 
 ## Покрытие ресурсов
