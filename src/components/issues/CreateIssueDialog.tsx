@@ -21,6 +21,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IssueFormFields, type IssueFormValues } from "@/components/issues/IssueFormFields";
 import type { RedmineClient } from "@/api/client";
+import type { AuthUser } from "@/contexts/AuthContext";
 import type { Project } from "@/hooks/useProjects";
 import { useTrackers } from "@/hooks/useTrackers";
 import { useIssuePriorities, type IssuePriority } from "@/hooks/useIssuePriorities";
@@ -53,6 +54,8 @@ export interface CreateIssueDialogProps {
   projects: Project[];
   /** Проект по умолчанию для новой задачи - например, текущий фильтр в Topbar. */
   defaultProjectId?: number | null;
+  /** Текущий пользователь - подмешивается в список исполнителей, см. useProjectMembers. */
+  currentUser?: AuthUser | null;
   onCreated: (issue: IssueSummary) => void;
 }
 
@@ -66,6 +69,7 @@ export function CreateIssueDialog({
   client,
   projects,
   defaultProjectId,
+  currentUser,
   onCreated,
 }: CreateIssueDialogProps) {
   const [open, setOpen] = useState(false);
@@ -76,7 +80,7 @@ export function CreateIssueDialog({
 
   const { trackers } = useTrackers(client);
   const { priorities } = useIssuePriorities(client);
-  const { members } = useProjectMembers(client, projectId);
+  const { members } = useProjectMembers(client, projectId, currentUser);
   const { categories } = useProjectCategories(client, projectId);
   const { versions } = useProjectVersions(client, projectId);
 

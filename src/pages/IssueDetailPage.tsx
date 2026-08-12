@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -18,6 +19,7 @@ import { LogTimeDialog } from "@/components/time/LogTimeDialog";
 import { IssueFormFields, type IssueFormValues } from "@/components/issues/IssueFormFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssue } from "@/hooks/useIssue";
+import { useIssueSummaries } from "@/hooks/useIssueSummaries";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
 import { useTrackers } from "@/hooks/useTrackers";
@@ -25,8 +27,20 @@ import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectCategories } from "@/hooks/useProjectCategories";
 import { useProjectVersions } from "@/hooks/useProjectVersions";
-import { updateIssue, type Issue, type IssueUpdateInput } from "@/api/issues";
+import {
+  createIssueRelation,
+  deleteIssueRelation,
+  updateIssue,
+  type Issue,
+  type IssueRelationType,
+  type IssueUpdateInput,
+} from "@/api/issues";
 import { createTimeEntry, type TimeEntryInput } from "@/api/timeEntries";
+import {
+  RELATION_TYPE_INVERSE,
+  RELATION_TYPE_LABELS,
+  RELATION_TYPE_OPTIONS,
+} from "@/lib/issue-relations";
 
 /** Человекочитаемые подписи для самых частых полей в истории изменений (journal.details). */
 const FIELD_LABELS: Record<string, string> = {
@@ -155,7 +169,7 @@ function JournalEntry({ journal }: { journal: NonNullable<Issue["journals"]>[num
 export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { client } = useAuth();
+  const { client, user } = useAuth();
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
   const issueId = id ? Number(id) : null;
@@ -163,9 +177,20 @@ export function IssueDetailPage() {
   const projectId = issue?.project?.id ?? null;
   const { trackers } = useTrackers(client);
   const { priorities } = useIssuePriorities(client);
-  const { members } = useProjectMembers(client, projectId);
+  const { members } = useProjectMembers(client, projectId, user);
   const { categories } = useProjectCategories(client, projectId);
   const { versions } = useProjectVersions(client, projectId);
+
+  // Родитель и "другая сторона" каждой связи отдают только { id } - подгружаем
+  // темы отдельно, см. useIssueSummaries.
+  const relationOtherIds = (issue?.relations ?? [])
+    .map((r) => (r.issue_id === issue?.id ? r.issue_to_id : r.issue_id))
+    .filter((v): v is number => v != null);
+  const summaryIds = [
+    ...(issue?.parent?.id ? [issue.parent.id] : []),
+    ...relationOtherIds,
+  ];
+  const relatedSummaries = useIssueSummaries(client, summaryIds);
 
   const [comment, setComment] = useState("");
   const [isSavingStatus, setIsSavingStatus] = useState(false);
@@ -177,6 +202,21 @@ export function IssueDetailPage() {
   const [editInitialValues, setEditInitialValues] = useState<IssueFormValues | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [parentInput, setParentInput] = useState("");
+  const [isEditingParent, setIsEditingParent] = useState(false);
+  const [isSavingParent, setIsSavingParent] = useState(false);
+  const [parentError, setParentError] = useState<string | null>(null);
+
+  const [childInput, setChildInput] = useState("");
+  const [isAddingChild, setIsAddingChild] = useState(false);
+  const [childError, setChildError] = useState<string | null>(null);
+
+  const [relationInput, setRelationInput] = useState("");
+  const [relationType, setRelationType] = useState<IssueRelationType>("relates");
+  const [isAddingRelation, setIsAddingRelation] = useState(false);
+  const [relationError, setRelationError] = useState<string | null>(null);
+  const [removingRelationId, setRemovingRelationId] = useState<number | null>(null);
 
   function handleStartEdit() {
     if (!issue) return;
@@ -196,6 +236,107 @@ export function IssueDetailPage() {
 
   function updateEditField<K extends keyof IssueFormValues>(field: K, value: IssueFormValues[K]) {
     setEditValues((v) => (v ? { ...v, [field]: value } : v));
+  }
+
+  async function handleSetParent() {
+    if (!client || !issue) return;
+    const parentId = Number(parentInput.trim());
+    if (!parentInput.trim() || !Number.isFinite(parentId)) {
+      setParentError("Укажите номер задачи.");
+      return;
+    }
+    if (parentId === issue.id) {
+      setParentError("Задача не может быть родителем сама себе.");
+      return;
+    }
+    setParentError(null);
+    setIsSavingParent(true);
+    try {
+      await updateIssue(client, issue.id, { parentId });
+      setIsEditingParent(false);
+      setParentInput("");
+      reload();
+    } catch (e) {
+      setParentError(e instanceof Error ? e.message : "Не удалось указать родительскую задачу.");
+    } finally {
+      setIsSavingParent(false);
+    }
+  }
+
+  async function handleClearParent() {
+    if (!client || !issue) return;
+    setParentError(null);
+    setIsSavingParent(true);
+    try {
+      await updateIssue(client, issue.id, { parentId: null });
+      reload();
+    } catch (e) {
+      setParentError(e instanceof Error ? e.message : "Не удалось убрать родительскую задачу.");
+    } finally {
+      setIsSavingParent(false);
+    }
+  }
+
+  async function handleAddChild() {
+    if (!client || !issue) return;
+    const childId = Number(childInput.trim());
+    if (!childInput.trim() || !Number.isFinite(childId)) {
+      setChildError("Укажите номер задачи.");
+      return;
+    }
+    if (childId === issue.id) {
+      setChildError("Задача не может быть подзадачей сама себе.");
+      return;
+    }
+    setChildError(null);
+    setIsAddingChild(true);
+    try {
+      await updateIssue(client, childId, { parentId: issue.id });
+      setChildInput("");
+      reload();
+    } catch (e) {
+      setChildError(e instanceof Error ? e.message : "Не удалось добавить подзадачу.");
+    } finally {
+      setIsAddingChild(false);
+    }
+  }
+
+  async function handleAddRelation() {
+    if (!client || !issue) return;
+    const issueToId = Number(relationInput.trim());
+    if (!relationInput.trim() || !Number.isFinite(issueToId)) {
+      setRelationError("Укажите номер задачи.");
+      return;
+    }
+    if (issueToId === issue.id) {
+      setRelationError("Задача не может быть связана сама с собой.");
+      return;
+    }
+    setRelationError(null);
+    setIsAddingRelation(true);
+    try {
+      await createIssueRelation(client, issue.id, { issueToId, relationType });
+      setRelationInput("");
+      reload();
+    } catch (e) {
+      setRelationError(e instanceof Error ? e.message : "Не удалось добавить связь.");
+    } finally {
+      setIsAddingRelation(false);
+    }
+  }
+
+  async function handleRemoveRelation(relationId: number) {
+    if (!client) return;
+    setRelationError(null);
+    setRemovingRelationId(relationId);
+    try {
+      await deleteIssueRelation(client, relationId);
+      reload();
+    } catch (e) {
+      setRelationError(e instanceof Error ? e.message : "Не удалось удалить связь.");
+    } finally {
+      setRemovingRelationId(null);
+    }
   }
 
   async function handleSaveEdit() {
@@ -428,6 +569,189 @@ export function IssueDetailPage() {
               )}
             </>
           )}
+
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>Подзадачи и связи</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              <div>
+                <div className="mb-1.5 text-xs text-muted-foreground">Родительская задача</div>
+                {issue.parent?.id ? (
+                  <div className="flex items-center gap-2">
+                    <Link to={`/issues/${issue.parent.id}`} className="text-sm hover:underline">
+                      #{issue.parent.id} — {relatedSummaries[issue.parent.id]?.subject ?? "..."}
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                      onClick={handleClearParent}
+                      disabled={isSavingParent}
+                      aria-label="Убрать родительскую задачу"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                ) : isEditingParent ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="w-28"
+                      placeholder="№ задачи"
+                      value={parentInput}
+                      onChange={(e) => setParentInput(e.target.value)}
+                    />
+                    <Button size="sm" onClick={handleSetParent} disabled={isSavingParent}>
+                      {isSavingParent && <Loader2 className="size-3.5 animate-spin" />}
+                      Указать
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsEditingParent(false);
+                        setParentInput("");
+                        setParentError(null);
+                      }}
+                      disabled={isSavingParent}
+                    >
+                      Отмена
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => setIsEditingParent(true)}
+                  >
+                    <Plus className="size-3.5" />
+                    Указать родителя
+                  </Button>
+                )}
+                {parentError && <p className="mt-1 text-xs text-destructive">{parentError}</p>}
+              </div>
+
+              <div>
+                <div className="mb-1.5 text-xs text-muted-foreground">Подзадачи</div>
+                {issue.children && issue.children.length > 0 ? (
+                  <ul className="flex flex-col gap-1">
+                    {issue.children.map((c, i) => (
+                      <li key={c.id ?? i}>
+                        <Link to={`/issues/${c.id}`} className="text-sm hover:underline">
+                          #{c.id} — {c.subject ?? "—"}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Нет</p>
+                )}
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    className="w-28"
+                    placeholder="№ задачи"
+                    value={childInput}
+                    onChange={(e) => setChildInput(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={handleAddChild}
+                    disabled={isAddingChild}
+                  >
+                    {isAddingChild && <Loader2 className="size-3.5 animate-spin" />}
+                    <Plus className="size-3.5" />
+                    Добавить подзадачу
+                  </Button>
+                </div>
+                {childError && <p className="mt-1 text-xs text-destructive">{childError}</p>}
+              </div>
+
+              <div>
+                <div className="mb-1.5 text-xs text-muted-foreground">Связанные задачи</div>
+                {issue.relations && issue.relations.length > 0 ? (
+                  <ul className="flex flex-col gap-1.5">
+                    {issue.relations.map((r, i) => {
+                      const type = r.relation_type ?? "relates";
+                      const isForward = r.issue_id === issue.id;
+                      const otherId = isForward ? r.issue_to_id : r.issue_id;
+                      const label = isForward
+                        ? RELATION_TYPE_LABELS[type]
+                        : RELATION_TYPE_LABELS[RELATION_TYPE_INVERSE[type]];
+                      const otherSummary = otherId != null ? relatedSummaries[otherId] : undefined;
+                      return (
+                        <li key={r.id ?? i} className="flex items-center justify-between gap-2">
+                          <span className="text-sm">
+                            <span className="text-muted-foreground">{label}:</span>{" "}
+                            {otherId != null ? (
+                              <Link to={`/issues/${otherId}`} className="hover:underline">
+                                #{otherId} — {otherSummary?.subject ?? "..."}
+                              </Link>
+                            ) : (
+                              "—"
+                            )}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                            onClick={() => r.id != null && handleRemoveRelation(r.id)}
+                            disabled={r.id == null || removingRelationId === r.id}
+                            aria-label="Удалить связь"
+                          >
+                            {removingRelationId === r.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <X className="size-3.5" />
+                            )}
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Нет</p>
+                )}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Select
+                    value={relationType}
+                    onValueChange={(v) => setRelationType(v as IssueRelationType)}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELATION_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    className="w-28"
+                    placeholder="№ задачи"
+                    value={relationInput}
+                    onChange={(e) => setRelationInput(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={handleAddRelation}
+                    disabled={isAddingRelation}
+                  >
+                    {isAddingRelation && <Loader2 className="size-3.5 animate-spin" />}
+                    <Plus className="size-3.5" />
+                    Добавить связь
+                  </Button>
+                </div>
+                {relationError && <p className="mt-1 text-xs text-destructive">{relationError}</p>}
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="flex items-center justify-between border-b">

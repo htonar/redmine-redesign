@@ -1,0 +1,25 @@
+# Локальный одноразовый Redmine для разработки/тестирования редизайна -
+# НЕ подключаться этим к реальным данным. SQLite (встроенный в официальный
+# образ, без отдельного контейнера БД) - вся история живёт в volume
+# `redmine-sqlite`, снести и поднять заново можно в любой момент:
+#   docker compose -f docker-compose.redmine.yml down -v
+#
+# Запуск:
+#   docker compose -f docker-compose.redmine.yml up -d
+# Открыть: http://localhost:3000 (admin/admin, Redmine попросит сменить пароль)
+services:
+  redmine:
+    image: redmine:6-alpine
+    container_name: redmine-local
+    ports:
+      - "3000:3000"
+    environment:
+      REDMINE_SECRET_KEY_BASE: supersecretkey_dev_only_do_not_use_in_prod
+    volumes:
+      - redmine-files:/usr/src/redmine/files
+      - redmine-sqlite:/usr/src/redmine/sqlite
+    restart: unless-stopped
+
+volumes:
+  redmine-files:
+  redmine-sqlite:
