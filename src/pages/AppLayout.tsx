@@ -34,6 +34,7 @@ export function AppLayout() {
         user={{
           name: `${user.firstname} ${user.lastname}`,
           initials: initials(user.firstname, user.lastname),
+          email: user.mail,
         }}
         onLogout={logout}
         theme={theme}
