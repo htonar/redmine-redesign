@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LoginPage } from "@/pages/LoginPage";
 import { AppLayout } from "@/pages/AppLayout";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -38,11 +39,13 @@ function AppGate() {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppGate />
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppGate />
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

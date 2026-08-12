@@ -17,6 +17,8 @@ export function AppShell({
   onProjectChange,
   user,
   onLogout,
+  theme,
+  onToggleTheme,
 }: AppShellProps) {
   return (
     <div className="flex h-svh bg-background text-foreground">
@@ -29,6 +31,8 @@ export function AppShell({
           onProjectChange={onProjectChange}
           user={user}
           onLogout={onLogout}
+          theme={theme}
+          onToggleTheme={onToggleTheme}
         />
         <main className="flex-1 overflow-auto bg-muted/40 p-6">
           {children}

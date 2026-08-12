@@ -71,13 +71,75 @@ export async function getIssue(client: RedmineClient, id: number): Promise<Issue
   return data.issue;
 }
 
-export interface IssueUpdateInput {
+/**
+ * Поля, общие для создания и правки задачи - см. IssueFormFields
+ * (src/components/issues/IssueFormFields.tsx), который редактирует именно
+ * этот набор. `null` у nullable-полей - явная очистка значения (например,
+ * "снять исполнителя"), `undefined` - поле не участвует в запросе.
+ */
+export interface IssueFieldsInput {
+  trackerId?: number;
   statusId?: number;
+  priorityId?: number;
+  subject?: string;
+  description?: string | null;
+  assignedToId?: number | null;
+  categoryId?: number | null;
+  fixedVersionId?: number | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  doneRatio?: number;
+  estimatedHours?: number | null;
+}
+
+export interface IssueCreateInput extends IssueFieldsInput {
+  projectId: number;
+  subject: string;
+}
+
+/** Создание новой задачи - см. CLAUDE.md. */
+export async function createIssue(
+  client: RedmineClient,
+  input: IssueCreateInput,
+): Promise<IssueSummary> {
+  const { data, error } = await client.POST("/issues.{format}", {
+    params: { path: { format: "json" } },
+    body: {
+      issue: {
+        project_id: input.projectId,
+        subject: input.subject,
+        tracker_id: input.trackerId,
+        status_id: input.statusId,
+        priority_id: input.priorityId,
+        description: input.description,
+        assigned_to_id: input.assignedToId,
+        category_id: input.categoryId,
+        fixed_version_id: input.fixedVersionId,
+        start_date: input.startDate,
+        due_date: input.dueDate,
+        done_ratio: input.doneRatio,
+        estimated_hours: input.estimatedHours,
+      },
+    },
+  });
+
+  if (error || !data) {
+    throw new Error("Не удалось создать задачу.");
+  }
+
+  return data.issue;
+}
+
+export interface IssueUpdateInput extends IssueFieldsInput {
   /** Текст комментария. Пустая строка/undefined - без добавления заметки. */
   notes?: string;
 }
 
-/** Смена статуса и/или добавление комментария - минимальная правка карточки, см. CLAUDE.md. */
+/**
+ * Правка задачи - смена статуса, комментарий и/или любые другие поля
+ * (тема, описание, исполнитель, приоритет, трекер, даты, категория, версия,
+ * готовность, оценка часов). Отправляются только заданные поля.
+ */
 export async function updateIssue(
   client: RedmineClient,
   id: number,
@@ -89,6 +151,17 @@ export async function updateIssue(
       issue: {
         status_id: input.statusId,
         notes: input.notes || undefined,
+        tracker_id: input.trackerId,
+        priority_id: input.priorityId,
+        subject: input.subject,
+        description: input.description,
+        assigned_to_id: input.assignedToId,
+        category_id: input.categoryId,
+        fixed_version_id: input.fixedVersionId,
+        start_date: input.startDate,
+        due_date: input.dueDate,
+        done_ratio: input.doneRatio,
+        estimated_hours: input.estimatedHours,
       },
     },
   });

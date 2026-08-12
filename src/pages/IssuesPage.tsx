@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { ArrowDown, ArrowUp, Bookmark, ChevronDown, Loader2, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,9 +27,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SaveViewDialog } from "@/components/issues/SaveViewDialog";
+import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssues } from "@/hooks/useIssues";
 import { useIssueViews } from "@/hooks/useIssueViews";
+import { useProjects } from "@/hooks/useProjects";
 import type { IssueListFilters } from "@/api/issues";
 import type { IssueView } from "@/lib/issue-views-storage";
 import { useLayoutContext } from "./AppLayout";
@@ -81,6 +83,7 @@ export function IssuesPage() {
   const { issues, totalCount, isLoading, isLoadingMore, error, hasMore, loadMore } =
     useIssues(client, filters);
   const { views, save, remove } = useIssueViews(baseUrl, user?.id);
+  const { projects } = useProjects(client);
 
   const [sortField, sortDir] = sort.split(":") as [string, "asc" | "desc"];
 
@@ -102,6 +105,19 @@ export function IssuesPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
+        <CreateIssueDialog
+          client={client}
+          projects={projects}
+          defaultProjectId={selectedProjectId}
+          onCreated={(issue) => navigate(`/issues/${issue.id}`)}
+          trigger={
+            <Button size="sm" className="gap-1.5">
+              <Plus className="size-3.5" />
+              Добавить задачу
+            </Button>
+          }
+        />
+
         <Select value={assignee} onValueChange={(v) => setAssignee(v as typeof assignee)}>
           <SelectTrigger className="w-40">
             <SelectValue />

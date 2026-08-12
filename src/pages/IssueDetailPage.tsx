@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +15,17 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LogTimeDialog } from "@/components/time/LogTimeDialog";
+import { IssueFormFields, type IssueFormValues } from "@/components/issues/IssueFormFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssue } from "@/hooks/useIssue";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
-import { updateIssue, type Issue } from "@/api/issues";
+import { useTrackers } from "@/hooks/useTrackers";
+import { useIssuePriorities } from "@/hooks/useIssuePriorities";
+import { useProjectMembers } from "@/hooks/useProjectMembers";
+import { useProjectCategories } from "@/hooks/useProjectCategories";
+import { useProjectVersions } from "@/hooks/useProjectVersions";
+import { updateIssue, type Issue, type IssueUpdateInput } from "@/api/issues";
 import { createTimeEntry, type TimeEntryInput } from "@/api/timeEntries";
 
 /** Человекочитаемые подписи для самых частых полей в истории изменений (journal.details). */
@@ -72,6 +78,50 @@ function Field({ label, children }: FieldProps) {
   );
 }
 
+function issueToFormValues(issue: Issue): IssueFormValues {
+  return {
+    subject: issue.subject,
+    trackerId: issue.tracker?.id ?? null,
+    priorityId: issue.priority?.id ?? null,
+    assignedToId: issue.assigned_to?.id ?? null,
+    categoryId: issue.category?.id ?? null,
+    fixedVersionId: issue.fixed_version?.id ?? null,
+    startDate: issue.start_date ?? "",
+    dueDate: issue.due_date ?? "",
+    doneRatio: issue.done_ratio ?? 0,
+    estimatedHours: issue.estimated_hours != null ? String(issue.estimated_hours) : "",
+    description: issue.description ?? "",
+  };
+}
+
+/** Патч только из полей, реально изменённых в форме - остальные не отправляем. */
+function diffFormValues(initial: IssueFormValues, current: IssueFormValues): IssueUpdateInput {
+  const patch: IssueUpdateInput = {};
+  if (current.subject !== initial.subject) patch.subject = current.subject;
+  if (current.trackerId !== initial.trackerId && current.trackerId !== null) {
+    patch.trackerId = current.trackerId;
+  }
+  if (current.priorityId !== initial.priorityId && current.priorityId !== null) {
+    patch.priorityId = current.priorityId;
+  }
+  if (current.assignedToId !== initial.assignedToId) patch.assignedToId = current.assignedToId;
+  if (current.categoryId !== initial.categoryId) patch.categoryId = current.categoryId;
+  if (current.fixedVersionId !== initial.fixedVersionId) {
+    patch.fixedVersionId = current.fixedVersionId;
+  }
+  if (current.startDate !== initial.startDate) patch.startDate = current.startDate || null;
+  if (current.dueDate !== initial.dueDate) patch.dueDate = current.dueDate || null;
+  if (current.doneRatio !== initial.doneRatio) patch.doneRatio = current.doneRatio;
+  if (current.estimatedHours !== initial.estimatedHours) {
+    const trimmed = current.estimatedHours.trim();
+    patch.estimatedHours = trimmed ? Number(trimmed.replace(",", ".")) : null;
+  }
+  if (current.description !== initial.description) {
+    patch.description = current.description || null;
+  }
+  return patch;
+}
+
 function JournalEntry({ journal }: { journal: NonNullable<Issue["journals"]>[number] }) {
   return (
     <div className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
@@ -96,8 +146,11 @@ function JournalEntry({ journal }: { journal: NonNullable<Issue["journals"]>[num
 /**
  * Карточка задачи: метаданные, смена статуса (из allowed_statuses - соблюдает
  * workflow текущего пользователя), описание, история/комментарии, быстрое
- * логирование времени. Правка остальных полей (тема, приоритет, исполнитель и
- * т.д.) - вне скоупа этой итерации, см. CLAUDE.md.
+ * логирование времени. Режим правки (кнопка "Редактировать") переключает блок
+ * метаданных+описания на IssueFormFields - тема, трекер, приоритет,
+ * исполнитель, категория, версия, даты, готовность, оценка часов, описание.
+ * Проект задачи не меняется (нет селектора). Смена статуса остается отдельным
+ * мгновенным контролом в шапке, вне формы правки - см. CLAUDE.md.
  */
 export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -107,11 +160,77 @@ export function IssueDetailPage() {
   const { activities } = useTimeEntryActivities(client);
   const issueId = id ? Number(id) : null;
   const { issue, isLoading, error, reload } = useIssue(client, issueId);
+  const projectId = issue?.project?.id ?? null;
+  const { trackers } = useTrackers(client);
+  const { priorities } = useIssuePriorities(client);
+  const { members } = useProjectMembers(client, projectId);
+  const { categories } = useProjectCategories(client, projectId);
+  const { versions } = useProjectVersions(client, projectId);
 
   const [comment, setComment] = useState("");
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState<IssueFormValues | null>(null);
+  const [editInitialValues, setEditInitialValues] = useState<IssueFormValues | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  function handleStartEdit() {
+    if (!issue) return;
+    const values = issueToFormValues(issue);
+    setEditValues(values);
+    setEditInitialValues(values);
+    setEditError(null);
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    setIsEditing(false);
+    setEditValues(null);
+    setEditInitialValues(null);
+    setEditError(null);
+  }
+
+  function updateEditField<K extends keyof IssueFormValues>(field: K, value: IssueFormValues[K]) {
+    setEditValues((v) => (v ? { ...v, [field]: value } : v));
+  }
+
+  async function handleSaveEdit() {
+    if (!client || !issue || !editValues || !editInitialValues) return;
+    setEditError(null);
+
+    if (!editValues.subject.trim()) {
+      setEditError("Укажите тему задачи.");
+      return;
+    }
+    const trimmedHours = editValues.estimatedHours.trim();
+    if (trimmedHours && !Number.isFinite(Number(trimmedHours.replace(",", ".")))) {
+      setEditError("Оценка часов должна быть числом.");
+      return;
+    }
+
+    const patch = diffFormValues(editInitialValues, editValues);
+    if (Object.keys(patch).length === 0) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await updateIssue(client, issue.id, patch);
+      setIsEditing(false);
+      setEditValues(null);
+      setEditInitialValues(null);
+      reload();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Не удалось сохранить изменения.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
 
   async function handleStatusChange(statusId: string) {
     if (!client || !issue) return;
@@ -186,6 +305,12 @@ export function IssueDetailPage() {
               <h1 className="text-xl font-semibold tracking-tight">{issue.subject}</h1>
             </div>
             <div className="flex items-center gap-2">
+              {!isEditing && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleStartEdit}>
+                  <Pencil className="size-3.5" />
+                  Редактировать
+                </Button>
+              )}
               {issue.priority?.name && <Badge variant="outline">{issue.priority.name}</Badge>}
               {issue.allowed_statuses && issue.allowed_statuses.length > 0 ? (
                 <Select
@@ -214,49 +339,94 @@ export function IssueDetailPage() {
             </div>
           </div>
 
-          <Card>
-            <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              <Field label="Проект">
-                {issue.project ? (
-                  <Link to="/issues" className="hover:underline">
-                    {issue.project.name}
-                  </Link>
-                ) : (
-                  "—"
-                )}
-              </Field>
-              <Field label="Автор">{issue.author?.name ?? "—"}</Field>
-              <Field label="Исполнитель">{issue.assigned_to?.name ?? "—"}</Field>
-              <Field label="Категория">{issue.category?.name ?? "—"}</Field>
-              <Field label="Версия">{issue.fixed_version?.name ?? "—"}</Field>
-              <Field label="Начало">{issue.start_date ? formatDate(issue.start_date) : "—"}</Field>
-              <Field label="Срок">{issue.due_date ? formatDate(issue.due_date) : "—"}</Field>
-              <Field label="Обновлено">{formatDateTime(issue.updated_on)}</Field>
-              <Field label="Оценка">
-                {issue.estimated_hours != null ? `${issue.estimated_hours} ч` : "—"}
-              </Field>
-              <Field label="Потрачено">
-                {issue.spent_hours != null ? `${issue.spent_hours.toFixed(2)} ч` : "—"}
-              </Field>
-              <div className="col-span-2 sm:col-span-3 lg:col-span-4">
-                <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Готовность</span>
-                  <span>{issue.done_ratio}%</span>
-                </div>
-                <Progress value={issue.done_ratio} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {issue.description && (
+          {isEditing && editValues ? (
             <Card>
               <CardHeader className="border-b">
-                <CardTitle>Описание</CardTitle>
+                <CardTitle>Правка задачи</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{issue.description}</p>
+                <IssueFormFields
+                  values={editValues}
+                  onChange={updateEditField}
+                  trackers={trackers}
+                  priorities={priorities}
+                  members={members}
+                  categories={categories}
+                  versions={versions}
+                  subjectRequired
+                />
+
+                {editError && (
+                  <Alert variant="destructive" className="mt-3">
+                    <AlertDescription>{editError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="mt-4 flex items-center gap-2">
+                  <Button size="sm" onClick={handleSaveEdit} disabled={isSavingEdit}>
+                    {isSavingEdit && <Loader2 className="size-3.5 animate-spin" />}
+                    Сохранить
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleCancelEdit}
+                    disabled={isSavingEdit}
+                  >
+                    Отмена
+                  </Button>
+                </div>
               </CardContent>
             </Card>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  <Field label="Проект">
+                    {issue.project ? (
+                      <Link to="/issues" className="hover:underline">
+                        {issue.project.name}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
+                  </Field>
+                  <Field label="Автор">{issue.author?.name ?? "—"}</Field>
+                  <Field label="Исполнитель">{issue.assigned_to?.name ?? "—"}</Field>
+                  <Field label="Категория">{issue.category?.name ?? "—"}</Field>
+                  <Field label="Версия">{issue.fixed_version?.name ?? "—"}</Field>
+                  <Field label="Начало">
+                    {issue.start_date ? formatDate(issue.start_date) : "—"}
+                  </Field>
+                  <Field label="Срок">{issue.due_date ? formatDate(issue.due_date) : "—"}</Field>
+                  <Field label="Обновлено">{formatDateTime(issue.updated_on)}</Field>
+                  <Field label="Оценка">
+                    {issue.estimated_hours != null ? `${issue.estimated_hours} ч` : "—"}
+                  </Field>
+                  <Field label="Потрачено">
+                    {issue.spent_hours != null ? `${issue.spent_hours.toFixed(2)} ч` : "—"}
+                  </Field>
+                  <div className="col-span-2 sm:col-span-3 lg:col-span-4">
+                    <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Готовность</span>
+                      <span>{issue.done_ratio}%</span>
+                    </div>
+                    <Progress value={issue.done_ratio} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {issue.description && (
+                <Card>
+                  <CardHeader className="border-b">
+                    <CardTitle>Описание</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm whitespace-pre-wrap">{issue.description}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
           <Card>

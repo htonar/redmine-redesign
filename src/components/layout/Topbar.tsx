@@ -1,4 +1,4 @@
-import { ChevronDown, Search } from 'lucide-react'
+import { ChevronDown, Moon, Search, Sun } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,8 @@ export interface TopbarProps {
   onProjectChange: (projectId: number | null) => void
   user: CurrentUser
   onLogout: () => void
+  theme: 'light' | 'dark'
+  onToggleTheme: () => void
 }
 
 /** Верхняя панель рабочей области: поиск, переключатель проекта, пользователь. */
@@ -33,6 +35,8 @@ export function Topbar({
   onProjectChange,
   user,
   onLogout,
+  theme,
+  onToggleTheme,
 }: TopbarProps) {
   const currentProjectName =
     projects.find((p) => p.id === selectedProjectId)?.name ?? 'Все проекты'
@@ -71,6 +75,15 @@ export function Topbar({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+          onClick={onToggleTheme}
+        >
+          {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -3,6 +3,7 @@ import { Outlet, useOutletContext } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useProjects } from "@/hooks/useProjects";
 
 interface LayoutContext {
@@ -17,6 +18,7 @@ function initials(firstname: string, lastname: string): string {
 /** Общий каркас авторизованной части приложения - сайдбар/топбар + текущий раздел. */
 export function AppLayout() {
   const { user, client, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const { projects, isLoading: projectsLoading } = useProjects(client);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
 
@@ -34,6 +36,8 @@ export function AppLayout() {
           initials: initials(user.firstname, user.lastname),
         }}
         onLogout={logout}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       >
         <Outlet
           context={{ selectedProjectId, setSelectedProjectId } satisfies LayoutContext}
