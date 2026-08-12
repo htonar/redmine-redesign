@@ -1,32 +1,41 @@
-# React + TypeScript + Vite
+# Redmine Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Свой фронтенд для [Redmine](https://www.redmine.org/) поверх его REST API —
+переосмысленный UI (см. [дизайн-концепт](docs/design.md)), собственный React-клиент
+вместо стандартного Rails-интерфейса Redmine.
 
-Currently, two official plugins are available:
+## Стек
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **React 19 + TypeScript**, сборка на **Vite**
+- **openapi-typescript + openapi-fetch** — типизированный клиент к Redmine REST API,
+  сгенерированный из неофициальной OpenAPI-спеки
+  ([d-yoshi/redmine-openapi](https://github.com/d-yoshi/redmine-openapi))
+- **oxlint** — линтер
 
-## React Compiler
+## Документация проекта
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [`CLAUDE.md`](CLAUDE.md) — контекст для разработки: архитектурные решения,
+  ограничения Redmine API, статус задач
+- [`docs/redmine-api.md`](docs/redmine-api.md) — спека REST API, генерация типов,
+  устройство клиента, аутентификация
+- [`docs/design.md`](docs/design.md) — дизайн-язык интерфейса (референс, палитра,
+  компоненты, лейаут)
 
-## Expanding the Oxlint configuration
+## Структура
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```
+api/redmine-openapi.yaml   # OpenAPI-спека Redmine REST API
+src/api/schema.d.ts        # сгенерированные TS-типы (не редактировать руками)
+src/api/client.ts          # фабрика типизированного клиента
+docs/                      # спека API, дизайн-документация
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Разработка
+
+```sh
+npm install
+npm run dev            # dev-сервер
+npm run build           # tsc -b && vite build
+npm run lint             # oxlint
+npm run api:generate    # перегенерировать TS-типы из api/redmine-openapi.yaml
+```
