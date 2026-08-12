@@ -38,6 +38,14 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
+ * URL прокси-сервера (server/) - см. CLAUDE.md "CORS и прокси-бэкенд". Без
+ * него запросы к большинству реальных Redmine-инстансов блокируются CORS.
+ * Не задан - работаем как раньше, напрямую (годится для инстансов, у которых
+ * CORS настроен, или для локальной разработки).
+ */
+const PROXY_URL = import.meta.env.VITE_REDMINE_PROXY_URL;
+
+/**
  * Ходит в GET /my/account.json с переданным клиентом - так проверяем, что
  * API-ключ действительно валиден, а не просто сохранен локально.
  */
@@ -97,6 +105,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const restoredClient = createRedmineClient({
       baseUrl: stored.baseUrl,
       auth: { apiKey: stored.apiKey },
+      proxyUrl: PROXY_URL,
     });
 
     fetchAccount(restoredClient)
@@ -117,7 +126,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setError(null);
 
     const baseUrl = normalizeBaseUrl(rawBaseUrl);
-    const newClient = createRedmineClient({ baseUrl, auth: { apiKey } });
+    const newClient = createRedmineClient({
+      baseUrl,
+      auth: { apiKey },
+      proxyUrl: PROXY_URL,
+    });
 
     try {
       const account = await fetchAccount(newClient);

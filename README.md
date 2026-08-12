@@ -12,6 +12,8 @@
   ([d-yoshi/redmine-openapi](https://github.com/d-yoshi/redmine-openapi))
 - **Tailwind CSS v4 + shadcn/ui (Radix Primitives)** - UI-компоненты, тема настроена
   под дизайн-референс (см. [`docs/design.md`](docs/design.md))
+- **Node.js + Hono** (`server/`) - прокси-бэкенд, обходит отсутствие CORS у
+  Redmine (см. [`CLAUDE.md`](CLAUDE.md), раздел "CORS и прокси-бэкенд")
 - **oxlint** - линтер
 
 ## Документация проекта
@@ -32,15 +34,29 @@ src/api/client.ts          # фабрика типизированного кл�
 src/components/ui/         # shadcn/ui примитивы (кнопки, dropdown, карточки...)
 src/components/layout/     # Sidebar, Topbar, AppShell
 src/index.css              # тема (токены цвета/шрифта), см. docs/design.md
+server/                    # прокси-бэкенд (обход CORS), отдельный npm-пакет
 docs/                      # спека API, дизайн-документация
 ```
 
 ## Разработка
 
+Фронтенд:
+
 ```sh
 npm install
-npm run dev            # dev-сервер
-npm run build           # tsc -b && vite build
-npm run lint             # oxlint
-npm run api:generate    # перегенерировать TS-типы из api/redmine-openapi.yaml
+cp .env.example .env    # VITE_REDMINE_PROXY_URL, если нужен прокси (см. ниже)
+npm run dev              # dev-сервер
+npm run build             # tsc -b && vite build
+npm run lint               # oxlint
+npm run api:generate      # перегенерировать TS-типы из api/redmine-openapi.yaml
+```
+
+Прокси-бэкенд (нужен почти всегда - см.
+[`CLAUDE.md`](CLAUDE.md#cors-и-прокси-бэкенд), у Redmine обычно нет CORS):
+
+```sh
+cd server
+npm install
+cp .env.example .env    # прописать ALLOWED_REDMINE_HOSTS
+npm run dev
 ```
