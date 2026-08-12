@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { ArrowDown, ArrowUp, Bookmark, ChevronDown, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ function formatDate(iso: string): string {
  * "Список задач: фильтры, сортировка, сохраненные виды".
  */
 export function IssuesPage() {
+  const navigate = useNavigate();
   const { client, baseUrl, user } = useAuth();
   const { selectedProjectId, setSelectedProjectId } = useLayoutContext();
   const [assignee, setAssignee] = useState<IssueListFilters["assignee"]>(
@@ -217,7 +219,11 @@ export function IssuesPage() {
 
             {!isLoading &&
               issues.map((issue) => (
-                <TableRow key={issue.id}>
+                <TableRow
+                  key={issue.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/issues/${issue.id}`)}
+                >
                   <TableCell className="text-muted-foreground">#{issue.id}</TableCell>
                   <TableCell className="max-w-xs truncate font-medium">
                     {issue.subject}

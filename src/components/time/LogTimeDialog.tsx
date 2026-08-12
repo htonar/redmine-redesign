@@ -39,6 +39,8 @@ export interface LogTimeDialogProps {
   activities: TimeEntryActivity[];
   /** Проект по умолчанию для новой записи - например, текущий фильтр в Topbar. */
   defaultProjectId?: number | null;
+  /** Задача по умолчанию для новой записи - например, открытая карточка задачи. */
+  defaultIssueId?: number;
   /** Если задано - форма открывается в режиме правки существующей записи. */
   initial?: LogTimeDialogInitial;
   onSubmit: (input: TimeEntryInput) => Promise<void>;
@@ -65,6 +67,7 @@ export function LogTimeDialog({
   projects,
   activities,
   defaultProjectId,
+  defaultIssueId,
   initial,
   onSubmit,
 }: LogTimeDialogProps) {
@@ -87,7 +90,9 @@ export function LogTimeDialog({
   const commentsFieldId = useId();
 
   function resetForm() {
-    setIssueId(initial?.issueId ? String(initial.issueId) : "");
+    setIssueId(
+      initial?.issueId ? String(initial.issueId) : defaultIssueId ? String(defaultIssueId) : "",
+    );
     setProjectId(initial?.projectId ?? defaultProjectId ?? null);
     setSpentOn(initial?.spentOn ?? todayIsoDate());
     setHours(initial?.hours !== undefined ? String(initial.hours) : "");

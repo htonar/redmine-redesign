@@ -4,6 +4,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { AppLayout } from "@/pages/AppLayout";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { IssuesPage } from "@/pages/IssuesPage";
+import { IssueDetailPage } from "@/pages/IssueDetailPage";
 import { TimeTrackingPage } from "@/pages/TimeTrackingPage";
 
 function AppGate() {
@@ -26,6 +27,7 @@ function AppGate() {
       <Route element={<AppLayout />}>
         <Route index element={<Navigate to="/issues" replace />} />
         <Route path="/issues" element={<IssuesPage />} />
+        <Route path="/issues/:id" element={<IssueDetailPage />} />
         <Route path="/time" element={<TimeTrackingPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="*" element={<Navigate to="/issues" replace />} />

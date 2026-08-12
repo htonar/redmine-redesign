@@ -2,6 +2,7 @@ import type { RedmineClient } from "@/api/client";
 import type { components } from "@/api/schema";
 
 export type IssueSummary = components["schemas"]["issue.summary"];
+export type Issue = components["schemas"]["issue"];
 
 export interface IssueListFilters {
   projectId?: number;
@@ -52,4 +53,47 @@ export async function listIssues(
   }
 
   return { issues: data.issues, totalCount: data.total_count ?? data.issues.length };
+}
+
+/** Карточка задачи - все поля + история изменений и доступные для текущего пользователя переходы статуса. */
+export async function getIssue(client: RedmineClient, id: number): Promise<Issue> {
+  const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
+    params: {
+      path: { format: "json", issue_id: id },
+      query: { include: ["journals", "allowed_statuses"] },
+    },
+  });
+
+  if (error || !data) {
+    throw new Error("Не удалось загрузить задачу.");
+  }
+
+  return data.issue;
+}
+
+export interface IssueUpdateInput {
+  statusId?: number;
+  /** Текст комментария. Пустая строка/undefined - без добавления заметки. */
+  notes?: string;
+}
+
+/** Смена статуса и/или добавление комментария - минимальная правка карточки, см. CLAUDE.md. */
+export async function updateIssue(
+  client: RedmineClient,
+  id: number,
+  input: IssueUpdateInput,
+): Promise<void> {
+  const { error } = await client.PUT("/issues/{issue_id}.{format}", {
+    params: { path: { format: "json", issue_id: id } },
+    body: {
+      issue: {
+        status_id: input.statusId,
+        notes: input.notes || undefined,
+      },
+    },
+  });
+
+  if (error) {
+    throw new Error("Не удалось обновить задачу.");
+  }
 }
