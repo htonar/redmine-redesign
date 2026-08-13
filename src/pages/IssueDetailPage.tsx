@@ -1035,6 +1035,7 @@ export function IssueDetailPage() {
             <CardHeader className="flex items-center justify-between border-b">
               <CardTitle>Время</CardTitle>
               <LogTimeDialog
+                client={client}
                 projects={projects}
                 activities={activities}
                 defaultProjectId={issue.project?.id}
