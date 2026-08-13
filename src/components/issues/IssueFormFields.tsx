@@ -14,6 +14,9 @@ import type { IssuePriority } from "@/hooks/useIssuePriorities";
 import type { ProjectMember } from "@/hooks/useProjectMembers";
 import type { ProjectCategory } from "@/hooks/useProjectCategories";
 import type { ProjectVersion } from "@/hooks/useProjectVersions";
+import { MarkdownEditor } from "@/components/markdown/MarkdownEditor";
+import type { UploadedFile } from "@/api/attachments";
+import type { RedmineClient } from "@/api/client";
 
 const UNASSIGNED = "none";
 const DONE_RATIO_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
@@ -189,6 +192,9 @@ export interface IssueFormFieldsProps {
   versions: ProjectVersion[];
   /** Тема - обязательное поле, единственное, которое здесь валидируется визуально. */
   subjectRequired?: boolean;
+  /** Для вставки файлов по Ctrl+V в описание (MarkdownEditor) - см. CLAUDE.md, "Markdown-редактор". */
+  client: RedmineClient | null;
+  onDescriptionUpload?: (file: UploadedFile) => void;
 }
 
 /**
@@ -207,6 +213,8 @@ export function IssueFormFields({
   categories,
   versions,
   subjectRequired,
+  client,
+  onDescriptionUpload,
 }: IssueFormFieldsProps) {
   const subjectId = useId();
   const trackerId = useId();
@@ -432,11 +440,13 @@ export function IssueFormFields({
         <Label htmlFor={descriptionId} className="mb-1.5">
           Описание
         </Label>
-        <Textarea
+        <MarkdownEditor
           id={descriptionId}
+          client={client}
           rows={5}
           value={values.description}
-          onChange={(e) => onChange("description", e.target.value)}
+          onChange={(v) => onChange("description", v)}
+          onUpload={onDescriptionUpload}
           placeholder="Необязательно"
         />
       </div>

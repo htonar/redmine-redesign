@@ -29,6 +29,11 @@ const ISSUE_PAGE_HOTKEYS: HotkeyRow[] = [
     description: "Отправить комментарий",
     chord: true,
   },
+  {
+    keys: ["Ctrl", "S"],
+    description: "Сохранить форму правки задачи",
+    chord: true,
+  },
 ];
 
 function Kbd({ children }: { children: string }) {

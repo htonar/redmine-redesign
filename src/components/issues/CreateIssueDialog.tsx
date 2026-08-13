@@ -37,6 +37,7 @@ import {
   type IssueFormValues,
 } from "@/components/issues/IssueFormFields";
 import { SaveTemplateDialog } from "@/components/issues/SaveTemplateDialog";
+import type { UploadedFile } from "@/api/attachments";
 import type { RedmineClient } from "@/api/client";
 import type { AuthUser } from "@/contexts/AuthContext";
 import type { Project } from "@/hooks/useProjects";
@@ -116,6 +117,10 @@ export function CreateIssueDialog({
   const [values, setValues] = useState<IssueFormValues>(EMPTY_VALUES);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // Файлы, вставленные по Ctrl+V в описание, пока задачи ещё не существует -
+  // токены отправятся вместе с созданием задачи (см. handleSubmit). См.
+  // CLAUDE.md, "Markdown-редактор".
+  const [pendingUploads, setPendingUploads] = useState<UploadedFile[]>([]);
 
   const { trackers } = useTrackers(client);
   const { priorities } = useIssuePriorities(client);
@@ -167,6 +172,7 @@ export function CreateIssueDialog({
     );
     setValues(EMPTY_VALUES);
     setFormError(null);
+    setPendingUploads([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -286,6 +292,10 @@ export function CreateIssueDialog({
         values.customFields.length > 0
           ? values.customFields.map((f) => ({ id: f.id, value: f.value }))
           : undefined,
+      // Файлы, вставленные по Ctrl+V в описание до сохранения формы (см.
+      // MarkdownEditor/pendingUploads выше) - без этого токены загрузки
+      // остались бы висеть непривязанными ни к какой задаче.
+      uploads: pendingUploads.length > 0 ? pendingUploads : undefined,
     };
 
     setIsSubmitting(true);
@@ -399,6 +409,10 @@ export function CreateIssueDialog({
                 categories={categories}
                 versions={versions}
                 subjectRequired
+                client={client}
+                onDescriptionUpload={(f) =>
+                  setPendingUploads((prev) => [...prev, f])
+                }
               />
             </div>
           </div>
