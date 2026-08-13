@@ -49,6 +49,7 @@ import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectCategories } from "@/hooks/useProjectCategories";
 import { useProjectVersions } from "@/hooks/useProjectVersions";
 import { useIssueTemplates } from "@/hooks/useIssueTemplates";
+import { useCustomFieldDefinitions } from "@/hooks/useCustomFieldDefinitions";
 import {
   createIssue,
   type IssueCreateInput,
@@ -67,6 +68,7 @@ const EMPTY_VALUES: IssueFormValues = {
   doneRatio: 0,
   estimatedHours: "",
   description: "",
+  customFields: [],
 };
 
 function defaultPriorityId(priorities: IssuePriority[]): number | null {
@@ -125,6 +127,8 @@ export function CreateIssueDialog({
     save: saveTemplate,
     remove: removeTemplate,
   } = useIssueTemplates(baseUrl ?? null, currentUser?.id);
+  const { definitions: customFieldDefinitions } =
+    useCustomFieldDefinitions(client);
 
   const projectFieldId = useId();
 
@@ -141,6 +145,15 @@ export function CreateIssueDialog({
   // onOpenChange для переходов, инициированных снаружи (только для
   // собственных - клика по оверлею/Esc/DialogTrigger), иначе форма
   // открывалась бы с данными от предыдущего открытия.
+  //
+  // Важно: этот эффект должен идти РАНЬШЕ эффекта пользовательских полей
+  // ниже - React выполняет эффекты одного коммита в порядке объявления, а
+  // оба зависят от [open]. Если бы порядок был обратный, сброс формы здесь
+  // отрабатывал бы после того, как эффект полей уже проставил customFields,
+  // и затирал бы их обратно в [] на каждое открытие диалога - ровно так и
+  // было до фикса, поймано сквозным прогоном в браузере (админские
+  // is_for_all-поля не показывались вообще, хотя GET /custom_fields.json
+  // отрабатывал успешно).
   useEffect(() => {
     if (!open) return;
     // defaultProjectId годится, только если он есть в списке projects - тот
@@ -156,6 +169,48 @@ export function CreateIssueDialog({
     setFormError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Пользовательские поля, применимые к выбранному трекеру - доступны только
+  // если GET /custom_fields.json вообще отдал данные (только для админов,
+  // см. useCustomFieldDefinitions). Для не-админов customFieldDefinitions
+  // пуст - секция просто не появится, это ожидаемое поведение, не баг
+  // (см. CLAUDE.md, "Custom fields").
+  //
+  // Не полагаемся на d.is_for_all - реальный Redmine (проверено на локальном
+  // инстансе) молча не отдаёт этот ключ в JSON вообще, ни истинный, ни
+  // ложный (похоже на баг сериализации в самом Redmine, не в нашем клиенте).
+  // Вместо него - members d.trackers: поле применимо к задаче, только если
+  // оно явно привязано к её трекеру. Проверено экспериментально через rails
+  // console на локальном инстансе - ПУСТОЙ trackers означает "ни к одному
+  // трекеру", а НЕ "ко всем" (даже у поля с is_for_all=true в БД): Redmine
+  // молча не сохраняет значение такого поля вообще, полагаться на "пустой
+  // список = применимо всегда" нельзя, это ложная эвристика (мой первый
+  // вариант был неверен - см. историю коммитов). is_for_all - это отдельная
+  // ось (разрешает не привязывать поле к каждому ПРОЕКТУ по отдельности), не
+  // заменяет привязку к трекеру.
+  useEffect(() => {
+    if (!open || customFieldDefinitions.length === 0) return;
+    const applicable = customFieldDefinitions.filter(
+      (d) =>
+        d.customized_type === "issue" &&
+        d.trackers?.some((t) => t.id === values.trackerId),
+    );
+    setValues((v) => ({
+      ...v,
+      customFields: applicable.map((d) => {
+        const existing = v.customFields.find((f) => f.id === d.id);
+        return {
+          id: d.id,
+          name: d.name,
+          value: existing?.value ?? d.default_value ?? (d.multiple ? [] : ""),
+          fieldFormat: d.field_format,
+          possibleValues: d.possible_values,
+          multiple: d.multiple,
+        };
+      }),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, values.trackerId, customFieldDefinitions]);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -227,6 +282,10 @@ export function CreateIssueDialog({
       dueDate: values.dueDate || undefined,
       doneRatio: values.doneRatio,
       estimatedHours: parsedEstimatedHours,
+      customFields:
+        values.customFields.length > 0
+          ? values.customFields.map((f) => ({ id: f.id, value: f.value }))
+          : undefined,
     };
 
     setIsSubmitting(true);
