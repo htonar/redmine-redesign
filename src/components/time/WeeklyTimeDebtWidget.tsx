@@ -29,8 +29,15 @@ function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime
     <div className="flex flex-col items-center gap-1.5">
       <div
         className={cn(
-          "relative flex w-9 items-end overflow-hidden rounded-t-md",
-          day.isFuture ? "bg-muted/60" : met ? "bg-success/15" : "bg-warning/15",
+          // Дорожка - foreground/10, тот же прием, что и в Progress (см.
+          // progress.tsx) для фикса той же проблемы: bg-muted/60 и
+          // success|warning/15 почти сливались с фоном карточки в тёмной
+          // теме (обе близкие темные тона в этой палитре) - на 0ч
+          // залогированного дня дорожка была практически невидима, только
+          // подпись "0.0ч" намекала, что тут вообще есть столбик (найдено
+          // на аудите тёмной темы, GitHub issue #10).
+          "relative flex w-9 items-end overflow-hidden rounded-t-md bg-foreground/10",
+          day.isFuture && "opacity-50",
         )}
         style={{ height: BAR_HEIGHT_PX }}
         role="img"
