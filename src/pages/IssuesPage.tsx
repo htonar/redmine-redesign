@@ -123,6 +123,7 @@ export function IssuesPage() {
             client={client}
             projects={creatableProjects}
             defaultProjectId={selectedProjectId}
+            currentUser={user}
             onCreated={(issue) => navigate(`/issues/${issue.id}`)}
             trigger={
               <Button size="sm" className="gap-1.5">

@@ -1,6 +1,6 @@
 import { ChevronDown, Moon, Search, Sun } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -9,10 +9,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { Project } from '@/hooks/useProjects'
+import { getGravatarUrl } from '@/lib/gravatar'
 
 export interface CurrentUser {
   name: string
   initials: string
+  email: string
 }
 
 export interface TopbarProps {
@@ -93,6 +95,7 @@ export function Topbar({
             >
               <span className="text-sm font-medium">{user.name}</span>
               <Avatar className="size-8">
+                <AvatarImage src={getGravatarUrl(user.email, 64)} alt={user.name} />
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {user.initials}
                 </AvatarFallback>

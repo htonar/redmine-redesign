@@ -2,10 +2,7 @@ import {
   BarChart3,
   ClipboardList,
   Clock,
-  Folder,
-  Mail,
   PencilLine,
-  Target,
   User,
   type LucideIcon,
 } from 'lucide-react'
@@ -18,14 +15,19 @@ export interface NavItem {
   path?: string
 }
 
-/** Пункты левого сайдбара - см. docs/design.md, раздел "Компоненты, встреченные в макетах". */
+/**
+ * Пункты левого сайдбара - см. docs/design.md, раздел "Компоненты, встреченные
+ * в макетах". Список сверен с пользователем: "Сообщения" (форумы), "Файлы"
+ * (files-модуль) и "Цели" (не сущность Redmine вообще, декоративный пункт
+ * исходного макета) сознательно убраны - фокус на разработчике, который
+ * заводит задачи и трекает время, а не на паритете со всеми модулями
+ * нативного Redmine. "Отчеты" остаются в бэклоге, но не в приоритете - см.
+ * CLAUDE.md.
+ */
 export const navItems: NavItem[] = [
-  { id: 'profile', label: 'Профиль', icon: User },
-  { id: 'messages', label: 'Сообщения', icon: Mail },
+  { id: 'profile', label: 'Профиль', icon: User, path: '/profile' },
   { id: 'time', label: 'Учет времени', icon: Clock, path: '/time' },
   { id: 'activity', label: 'Активность', icon: BarChart3, path: '/dashboard' },
   { id: 'tasks', label: 'Задачи', icon: PencilLine, path: '/issues' },
   { id: 'reports', label: 'Отчеты', icon: ClipboardList },
-  { id: 'goals', label: 'Цели', icon: Target },
-  { id: 'files', label: 'Файлы', icon: Folder },
 ]

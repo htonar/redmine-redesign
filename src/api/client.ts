@@ -31,7 +31,16 @@ export interface RedmineClientOptions {
  */
 export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOptions) {
   const fetchBaseUrl = proxyUrl ? `${proxyUrl.replace(/\/+$/, "")}/proxy` : baseUrl;
-  const client = createClient<paths>({ baseUrl: fetchBaseUrl });
+  const client = createClient<paths>({
+    baseUrl: fetchBaseUrl,
+    // openapi-fetch по умолчанию сериализует массивы в query как повторяющиеся
+    // ключи (`include=a&include=b`) - Redmine (Rails/Rack) так не понимает,
+    // ждет один параметр через запятую (`include=a,b`), иначе видит только
+    // последнее значение. Реальный баг, найденный на include=journals,
+    // allowed_statuses,children,relations в getIssue (src/api/issues.ts) -
+    // Redmine получал только "relations", остальные include молча терялись.
+    querySerializer: { array: { style: "form", explode: false } },
+  });
 
   const authMiddleware: Middleware = {
     onRequest({ request }) {
@@ -43,7 +52,13 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
           `Basic ${btoa(`${auth.login}:${auth.password}`)}`,
         );
       }
-      request.headers.set("Content-Type", "application/json");
+      // Не перетираем Content-Type, если он уже явно задан вызывающим кодом
+      // (например, "application/octet-stream" при загрузке файла в
+      // uploadAttachment - src/api/attachments.ts). По умолчанию - json, как
+      // ждет большинство эндпоинтов Redmine.
+      if (!request.headers.has("Content-Type")) {
+        request.headers.set("Content-Type", "application/json");
+      }
       if (proxyUrl) {
         request.headers.set("X-Redmine-Target", baseUrl);
       }
