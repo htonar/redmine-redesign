@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "tauri": "tauri",
     "api:generate": "openapi-typescript api/redmine-openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
