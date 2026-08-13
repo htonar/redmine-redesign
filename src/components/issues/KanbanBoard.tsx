@@ -16,6 +16,7 @@ import { GripVertical, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { celebrate } from "@/lib/celebrate";
 import { useIssueStatuses } from "@/hooks/useIssueStatuses";
 import { useKanbanIssues } from "@/hooks/useKanbanIssues";
 import { updateIssue, type IssueSummary } from "@/api/issues";
@@ -54,7 +55,9 @@ function KanbanCard({ issue, draggable, onOpen }: KanbanCardProps) {
         transform ? { transform: CSS.Translate.toString(transform) } : undefined
       }
       className={cn(
-        "flex items-start gap-1.5 rounded-lg border border-border bg-card p-2.5 text-sm shadow-xs",
+        "flex items-start gap-1.5 rounded-lg border border-border bg-card p-2.5 text-sm shadow-xs transition-[transform,box-shadow] motion-reduce:transition-none",
+        !isDragging &&
+          "hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0",
         isDragging && "z-10 opacity-50",
       )}
     >
@@ -227,6 +230,9 @@ export function KanbanBoard({
 
     try {
       await updateIssue(client, issueId, { statusId: targetStatus.id });
+      // Мягкая геймификация - confetti при перетаскивании карточки в
+      // закрывающую колонку (не при каждом драге). См. lib/celebrate.ts.
+      if (targetStatus.isClosed && !prevStatus?.is_closed) celebrate();
     } catch (e) {
       if (prevStatus)
         moveLocally(
