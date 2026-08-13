@@ -1,10 +1,13 @@
-import { useState } from "react";
-import { Outlet, useOutletContext } from "react-router";
+import { useMemo, useState } from "react";
+import { Outlet, useNavigate, useOutletContext } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
+import { HotkeysHelpDialog } from "@/components/layout/HotkeysHelpDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useProjects } from "@/hooks/useProjects";
+import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 
 interface LayoutContext {
   selectedProjectId: number | null;
@@ -17,10 +20,37 @@ function initials(firstname: string, lastname: string): string {
 
 /** Общий каркас авторизованной части приложения - сайдбар/топбар + текущий раздел. */
 export function AppLayout() {
-  const { user, client, logout } = useAuth();
+  const { user, client, can, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { projects, isLoading: projectsLoading } = useProjects(client);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
+    null,
+  );
+  const navigate = useNavigate();
+  const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
+  const [isHotkeysHelpOpen, setIsHotkeysHelpOpen] = useState(false);
+
+  // Тот же фильтр по add_issues, что и кнопка "Добавить задачу" на IssuesPage
+  // (см. docs/permissions.md) - хоткей "c" не должен подсовывать проект без прав.
+  const creatableProjects = useMemo(
+    () => projects.filter((p) => can("add_issues", p.id)),
+    [projects, can],
+  );
+
+  useGlobalHotkeys({
+    onNavigateIssues: () => navigate("/issues"),
+    onNavigateDashboard: () => navigate("/dashboard"),
+    onNavigateTime: () => navigate("/time"),
+    onCreateIssue:
+      creatableProjects.length > 0
+        ? () => setIsCreateIssueOpen(true)
+        : undefined,
+    onFocusSearch: () =>
+      document
+        .querySelector<HTMLInputElement>('[data-slot="command-input"]')
+        ?.focus(),
+    onShowHelp: () => setIsHotkeysHelpOpen(true),
+  });
 
   if (!user) return null;
 
@@ -40,11 +70,31 @@ export function AppLayout() {
         onLogout={logout}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onShowHotkeysHelp={() => setIsHotkeysHelpOpen(true)}
       >
         <Outlet
-          context={{ selectedProjectId, setSelectedProjectId } satisfies LayoutContext}
+          context={
+            { selectedProjectId, setSelectedProjectId } satisfies LayoutContext
+          }
         />
       </AppShell>
+      {/* Глобальный диалог создания задачи для хоткея "c" - без trigger, только open/onOpenChange. */}
+      <CreateIssueDialog
+        client={client}
+        projects={creatableProjects}
+        defaultProjectId={selectedProjectId}
+        currentUser={user}
+        open={isCreateIssueOpen}
+        onOpenChange={setIsCreateIssueOpen}
+        onCreated={(issue) => {
+          setIsCreateIssueOpen(false);
+          navigate(`/issues/${issue.id}`);
+        }}
+      />
+      <HotkeysHelpDialog
+        open={isHotkeysHelpOpen}
+        onOpenChange={setIsHotkeysHelpOpen}
+      />
     </TooltipProvider>
   );
 }

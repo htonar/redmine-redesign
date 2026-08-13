@@ -1,4 +1,10 @@
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,16 +25,26 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { IssueFormFields, type IssueFormValues } from "@/components/issues/IssueFormFields";
+import {
+  IssueFormFields,
+  type IssueFormValues,
+} from "@/components/issues/IssueFormFields";
 import type { RedmineClient } from "@/api/client";
 import type { AuthUser } from "@/contexts/AuthContext";
 import type { Project } from "@/hooks/useProjects";
 import { useTrackers } from "@/hooks/useTrackers";
-import { useIssuePriorities, type IssuePriority } from "@/hooks/useIssuePriorities";
+import {
+  useIssuePriorities,
+  type IssuePriority,
+} from "@/hooks/useIssuePriorities";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectCategories } from "@/hooks/useProjectCategories";
 import { useProjectVersions } from "@/hooks/useProjectVersions";
-import { createIssue, type IssueCreateInput, type IssueSummary } from "@/api/issues";
+import {
+  createIssue,
+  type IssueCreateInput,
+  type IssueSummary,
+} from "@/api/issues";
 
 const EMPTY_VALUES: IssueFormValues = {
   subject: "",
@@ -49,7 +65,8 @@ function defaultPriorityId(priorities: IssuePriority[]): number | null {
 }
 
 export interface CreateIssueDialogProps {
-  trigger: ReactNode;
+  /** Без trigger диалог управляется только снаружи через open/onOpenChange (см. хоткей "c" в AppLayout). */
+  trigger?: ReactNode;
   client: RedmineClient | null;
   /** Проекты для селектора - вызывающий должен отфильтровать по праву add_issues (см. IssuesPage). */
   projects: Project[];
@@ -58,6 +75,9 @@ export interface CreateIssueDialogProps {
   /** Текущий пользователь - подмешивается в список исполнителей, см. useProjectMembers. */
   currentUser?: AuthUser | null;
   onCreated: (issue: IssueSummary) => void;
+  /** Управляемое состояние открытия - если не передано, диалог сам открывается по клику на trigger. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -72,8 +92,12 @@ export function CreateIssueDialog({
   defaultProjectId,
   currentUser,
   onCreated,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
 }: CreateIssueDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = setControlledOpen ?? setInternalOpen;
   const [projectId, setProjectId] = useState<number | null>(null);
   const [values, setValues] = useState<IssueFormValues>(EMPTY_VALUES);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,21 +119,35 @@ export function CreateIssueDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, priorities]);
 
+  // Сброс формы при открытии - вынесено из onOpenChange в эффект, потому что
+  // при управляемом open (см. хоткей "c" в AppLayout.tsx) Radix не вызывает
+  // onOpenChange для переходов, инициированных снаружи (только для
+  // собственных - клика по оверлею/Esc/DialogTrigger), иначе форма
+  // открывалась бы с данными от предыдущего открытия.
+  useEffect(() => {
+    if (!open) return;
+    // defaultProjectId годится, только если он есть в списке projects - тот
+    // уже отфильтрован по правам (add_issues) на стороне вызывающего (см.
+    // IssuesPage/AppLayout) - иначе откатываемся на первый доступный проект.
+    const defaultIsAllowed =
+      defaultProjectId != null &&
+      projects.some((p) => p.id === defaultProjectId);
+    setProjectId(
+      defaultIsAllowed ? defaultProjectId! : (projects[0]?.id ?? null),
+    );
+    setValues(EMPTY_VALUES);
+    setFormError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   function handleOpenChange(next: boolean) {
-    if (next) {
-      // defaultProjectId годится, только если он есть в списке projects -
-      // тот уже отфильтрован по правам (add_issues) на стороне вызывающего
-      // (см. IssuesPage) - иначе откатываемся на первый доступный проект.
-      const defaultIsAllowed =
-        defaultProjectId != null && projects.some((p) => p.id === defaultProjectId);
-      setProjectId(defaultIsAllowed ? defaultProjectId! : (projects[0]?.id ?? null));
-      setValues(EMPTY_VALUES);
-      setFormError(null);
-    }
     setOpen(next);
   }
 
-  function updateField<K extends keyof IssueFormValues>(field: K, value: IssueFormValues[K]) {
+  function updateField<K extends keyof IssueFormValues>(
+    field: K,
+    value: IssueFormValues[K],
+  ) {
     setValues((v) => ({ ...v, [field]: value }));
   }
 
@@ -129,7 +167,10 @@ export function CreateIssueDialog({
     const parsedEstimatedHours = values.estimatedHours.trim()
       ? Number(values.estimatedHours.replace(",", "."))
       : null;
-    if (parsedEstimatedHours !== null && !Number.isFinite(parsedEstimatedHours)) {
+    if (
+      parsedEstimatedHours !== null &&
+      !Number.isFinite(parsedEstimatedHours)
+    ) {
       setFormError("Оценка часов должна быть числом.");
       return;
     }
@@ -155,7 +196,9 @@ export function CreateIssueDialog({
       setOpen(false);
       onCreated(issue);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Не удалось создать задачу.");
+      setFormError(
+        err instanceof Error ? err.message : "Не удалось создать задачу.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -163,7 +206,7 @@ export function CreateIssueDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>

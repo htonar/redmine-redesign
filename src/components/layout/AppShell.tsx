@@ -1,11 +1,10 @@
-import type { PropsWithChildren } from 'react'
-import { Sidebar } from './Sidebar'
-import { Topbar, type CurrentUser, type TopbarProps } from './Topbar'
+import type { PropsWithChildren } from "react";
+import { Sidebar } from "./Sidebar";
+import { Topbar, type CurrentUser, type TopbarProps } from "./Topbar";
 
 export interface AppShellProps
-  extends PropsWithChildren,
-    Omit<TopbarProps, 'user'> {
-  user: CurrentUser
+  extends PropsWithChildren, Omit<TopbarProps, "user"> {
+  user: CurrentUser;
 }
 
 /** Общий каркас: темный сайдбар слева + топ-бар и контент справа. */
@@ -20,6 +19,7 @@ export function AppShell({
   onLogout,
   theme,
   onToggleTheme,
+  onShowHotkeysHelp,
 }: AppShellProps) {
   return (
     <div className="flex h-svh bg-background text-foreground">
@@ -35,11 +35,10 @@ export function AppShell({
           onLogout={onLogout}
           theme={theme}
           onToggleTheme={onToggleTheme}
+          onShowHotkeysHelp={onShowHotkeysHelp}
         />
-        <main className="flex-1 overflow-auto bg-muted/40 p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto bg-muted/40 p-6">{children}</main>
       </div>
     </div>
-  )
+  );
 }

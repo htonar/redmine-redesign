@@ -1,4 +1,10 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import {
   ArrowLeft,
@@ -27,7 +33,10 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LogTimeDialog } from "@/components/time/LogTimeDialog";
-import { IssueFormFields, type IssueFormValues } from "@/components/issues/IssueFormFields";
+import {
+  IssueFormFields,
+  type IssueFormValues,
+} from "@/components/issues/IssueFormFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssue } from "@/hooks/useIssue";
 import { useIssueSummaries } from "@/hooks/useIssueSummaries";
@@ -97,29 +106,41 @@ function issueToFormValues(issue: Issue): IssueFormValues {
     startDate: issue.start_date ?? "",
     dueDate: issue.due_date ?? "",
     doneRatio: issue.done_ratio ?? 0,
-    estimatedHours: issue.estimated_hours != null ? String(issue.estimated_hours) : "",
+    estimatedHours:
+      issue.estimated_hours != null ? String(issue.estimated_hours) : "",
     description: issue.description ?? "",
   };
 }
 
 /** Патч только из полей, реально изменённых в форме - остальные не отправляем. */
-function diffFormValues(initial: IssueFormValues, current: IssueFormValues): IssueUpdateInput {
+function diffFormValues(
+  initial: IssueFormValues,
+  current: IssueFormValues,
+): IssueUpdateInput {
   const patch: IssueUpdateInput = {};
   if (current.subject !== initial.subject) patch.subject = current.subject;
   if (current.trackerId !== initial.trackerId && current.trackerId !== null) {
     patch.trackerId = current.trackerId;
   }
-  if (current.priorityId !== initial.priorityId && current.priorityId !== null) {
+  if (
+    current.priorityId !== initial.priorityId &&
+    current.priorityId !== null
+  ) {
     patch.priorityId = current.priorityId;
   }
-  if (current.assignedToId !== initial.assignedToId) patch.assignedToId = current.assignedToId;
-  if (current.categoryId !== initial.categoryId) patch.categoryId = current.categoryId;
+  if (current.assignedToId !== initial.assignedToId)
+    patch.assignedToId = current.assignedToId;
+  if (current.categoryId !== initial.categoryId)
+    patch.categoryId = current.categoryId;
   if (current.fixedVersionId !== initial.fixedVersionId) {
     patch.fixedVersionId = current.fixedVersionId;
   }
-  if (current.startDate !== initial.startDate) patch.startDate = current.startDate || null;
-  if (current.dueDate !== initial.dueDate) patch.dueDate = current.dueDate || null;
-  if (current.doneRatio !== initial.doneRatio) patch.doneRatio = current.doneRatio;
+  if (current.startDate !== initial.startDate)
+    patch.startDate = current.startDate || null;
+  if (current.dueDate !== initial.dueDate)
+    patch.dueDate = current.dueDate || null;
+  if (current.doneRatio !== initial.doneRatio)
+    patch.doneRatio = current.doneRatio;
   if (current.estimatedHours !== initial.estimatedHours) {
     const trimmed = current.estimatedHours.trim();
     patch.estimatedHours = trimmed ? Number(trimmed.replace(",", ".")) : null;
@@ -172,7 +193,8 @@ export function IssueDetailPage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<IssueFormValues | null>(null);
-  const [editInitialValues, setEditInitialValues] = useState<IssueFormValues | null>(null);
+  const [editInitialValues, setEditInitialValues] =
+    useState<IssueFormValues | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -188,21 +210,30 @@ export function IssueDetailPage() {
   const [childError, setChildError] = useState<string | null>(null);
 
   const [relationInput, setRelationInput] = useState("");
-  const [relationType, setRelationType] = useState<IssueRelationType>("relates");
+  const [relationType, setRelationType] =
+    useState<IssueRelationType>("relates");
   const [isAddingRelation, setIsAddingRelation] = useState(false);
   const [relationError, setRelationError] = useState<string | null>(null);
-  const [removingRelationId, setRemovingRelationId] = useState<number | null>(null);
+  const [removingRelationId, setRemovingRelationId] = useState<number | null>(
+    null,
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
-  const [removingAttachmentId, setRemovingAttachmentId] = useState<number | null>(null);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<
+    number | null
+  >(null);
+  const [removingAttachmentId, setRemovingAttachmentId] = useState<
+    number | null
+  >(null);
 
   const [watcherInput, setWatcherInput] = useState("");
   const [isAddingWatcher, setIsAddingWatcher] = useState(false);
   const [watcherError, setWatcherError] = useState<string | null>(null);
-  const [removingWatcherId, setRemovingWatcherId] = useState<number | null>(null);
+  const [removingWatcherId, setRemovingWatcherId] = useState<number | null>(
+    null,
+  );
   const [isTogglingSelfWatch, setIsTogglingSelfWatch] = useState(false);
 
   function handleStartEdit() {
@@ -221,7 +252,39 @@ export function IssueDetailPage() {
     setEditError(null);
   }
 
-  function updateEditField<K extends keyof IssueFormValues>(field: K, value: IssueFormValues[K]) {
+  // Хоткей "e" - редактировать открытую задачу (см. CLAUDE.md, "Горячие
+  // клавиши"). Игнорируем, пока фокус в поле ввода/открыт диалог - иначе
+  // перехватывалась бы обычная буква "e" при наборе текста.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() !== "e") return;
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+      if (document.querySelector('[data-slot="dialog-content"]')) return;
+      if (!issue || isEditing || !can("edit_issues", projectId)) return;
+      e.preventDefault();
+      handleStartEdit();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issue, isEditing, projectId]);
+
+  function updateEditField<K extends keyof IssueFormValues>(
+    field: K,
+    value: IssueFormValues[K],
+  ) {
     setEditValues((v) => (v ? { ...v, [field]: value } : v));
   }
 
@@ -244,7 +307,11 @@ export function IssueDetailPage() {
       setParentInput("");
       reload();
     } catch (e) {
-      setParentError(e instanceof Error ? e.message : "Не удалось указать родительскую задачу.");
+      setParentError(
+        e instanceof Error
+          ? e.message
+          : "Не удалось указать родительскую задачу.",
+      );
     } finally {
       setIsSavingParent(false);
     }
@@ -258,7 +325,11 @@ export function IssueDetailPage() {
       await updateIssue(client, issue.id, { parentId: null });
       reload();
     } catch (e) {
-      setParentError(e instanceof Error ? e.message : "Не удалось убрать родительскую задачу.");
+      setParentError(
+        e instanceof Error
+          ? e.message
+          : "Не удалось убрать родительскую задачу.",
+      );
     } finally {
       setIsSavingParent(false);
     }
@@ -282,7 +353,9 @@ export function IssueDetailPage() {
       setChildInput("");
       reload();
     } catch (e) {
-      setChildError(e instanceof Error ? e.message : "Не удалось добавить подзадачу.");
+      setChildError(
+        e instanceof Error ? e.message : "Не удалось добавить подзадачу.",
+      );
     } finally {
       setIsAddingChild(false);
     }
@@ -306,7 +379,9 @@ export function IssueDetailPage() {
       setRelationInput("");
       reload();
     } catch (e) {
-      setRelationError(e instanceof Error ? e.message : "Не удалось добавить связь.");
+      setRelationError(
+        e instanceof Error ? e.message : "Не удалось добавить связь.",
+      );
     } finally {
       setIsAddingRelation(false);
     }
@@ -320,7 +395,9 @@ export function IssueDetailPage() {
       await deleteIssueRelation(client, relationId);
       reload();
     } catch (e) {
-      setRelationError(e instanceof Error ? e.message : "Не удалось удалить связь.");
+      setRelationError(
+        e instanceof Error ? e.message : "Не удалось удалить связь.",
+      );
     } finally {
       setRemovingRelationId(null);
     }
@@ -335,7 +412,9 @@ export function IssueDetailPage() {
       await updateIssue(client, issue.id, { uploads: [uploaded] });
       reload();
     } catch (e) {
-      setAttachmentError(e instanceof Error ? e.message : "Не удалось загрузить файл.");
+      setAttachmentError(
+        e instanceof Error ? e.message : "Не удалось загрузить файл.",
+      );
     } finally {
       setIsUploadingFile(false);
     }
@@ -355,7 +434,9 @@ export function IssueDetailPage() {
     try {
       await downloadAttachment(client, attachment);
     } catch (e) {
-      setAttachmentError(e instanceof Error ? e.message : "Не удалось скачать файл.");
+      setAttachmentError(
+        e instanceof Error ? e.message : "Не удалось скачать файл.",
+      );
     } finally {
       setDownloadingAttachmentId(null);
     }
@@ -369,7 +450,9 @@ export function IssueDetailPage() {
       await deleteAttachment(client, attachmentId);
       reload();
     } catch (e) {
-      setAttachmentError(e instanceof Error ? e.message : "Не удалось удалить файл.");
+      setAttachmentError(
+        e instanceof Error ? e.message : "Не удалось удалить файл.",
+      );
     } finally {
       setRemovingAttachmentId(null);
     }
@@ -384,7 +467,9 @@ export function IssueDetailPage() {
       setWatcherInput("");
       reload();
     } catch (e) {
-      setWatcherError(e instanceof Error ? e.message : "Не удалось добавить наблюдателя.");
+      setWatcherError(
+        e instanceof Error ? e.message : "Не удалось добавить наблюдателя.",
+      );
     } finally {
       setIsAddingWatcher(false);
     }
@@ -398,7 +483,9 @@ export function IssueDetailPage() {
       await removeWatcher(client, issue.id, userId);
       reload();
     } catch (e) {
-      setWatcherError(e instanceof Error ? e.message : "Не удалось убрать наблюдателя.");
+      setWatcherError(
+        e instanceof Error ? e.message : "Не удалось убрать наблюдателя.",
+      );
     } finally {
       setRemovingWatcherId(null);
     }
@@ -416,7 +503,9 @@ export function IssueDetailPage() {
       }
       reload();
     } catch (e) {
-      setWatcherError(e instanceof Error ? e.message : "Не удалось изменить подписку.");
+      setWatcherError(
+        e instanceof Error ? e.message : "Не удалось изменить подписку.",
+      );
     } finally {
       setIsTogglingSelfWatch(false);
     }
@@ -431,7 +520,10 @@ export function IssueDetailPage() {
       return;
     }
     const trimmedHours = editValues.estimatedHours.trim();
-    if (trimmedHours && !Number.isFinite(Number(trimmedHours.replace(",", ".")))) {
+    if (
+      trimmedHours &&
+      !Number.isFinite(Number(trimmedHours.replace(",", ".")))
+    ) {
       setEditError("Оценка часов должна быть числом.");
       return;
     }
@@ -450,7 +542,9 @@ export function IssueDetailPage() {
       setEditInitialValues(null);
       reload();
     } catch (e) {
-      setEditError(e instanceof Error ? e.message : "Не удалось сохранить изменения.");
+      setEditError(
+        e instanceof Error ? e.message : "Не удалось сохранить изменения.",
+      );
     } finally {
       setIsSavingEdit(false);
     }
@@ -464,7 +558,9 @@ export function IssueDetailPage() {
       await deleteIssue(client, issue.id);
       navigate("/issues");
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Не удалось удалить задачу.");
+      setActionError(
+        e instanceof Error ? e.message : "Не удалось удалить задачу.",
+      );
       setIsDeleting(false);
       setIsDeleteDialogOpen(false);
     }
@@ -478,7 +574,9 @@ export function IssueDetailPage() {
       await updateIssue(client, issue.id, { statusId: Number(statusId) });
       reload();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Не удалось изменить статус.");
+      setActionError(
+        e instanceof Error ? e.message : "Не удалось изменить статус.",
+      );
     } finally {
       setIsSavingStatus(false);
     }
@@ -493,7 +591,9 @@ export function IssueDetailPage() {
       setComment("");
       reload();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Не удалось добавить комментарий.");
+      setActionError(
+        e instanceof Error ? e.message : "Не удалось добавить комментарий.",
+      );
     } finally {
       setIsSavingComment(false);
     }
@@ -515,9 +615,13 @@ export function IssueDetailPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Button variant="ghost" size="sm" className="w-fit gap-1.5" onClick={() => navigate("/issues")}>
-        <ArrowLeft className="size-3.5" />
-        К списку задач
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-fit gap-1.5"
+        onClick={() => navigate("/issues")}
+      >
+        <ArrowLeft className="size-3.5" />К списку задач
       </Button>
 
       {(error || actionError) && (
@@ -540,11 +644,18 @@ export function IssueDetailPage() {
               <div className="text-xs text-muted-foreground">
                 {issue.tracker?.name ?? "Задача"} #{issue.id}
               </div>
-              <h1 className="text-xl font-semibold tracking-tight">{issue.subject}</h1>
+              <h1 className="text-xl font-semibold tracking-tight">
+                {issue.subject}
+              </h1>
             </div>
             <div className="flex items-center gap-2">
               {!isEditing && can("edit_issues", projectId) && (
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleStartEdit}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={handleStartEdit}
+                >
                   <Pencil className="size-3.5" />
                   Редактировать
                 </Button>
@@ -565,7 +676,9 @@ export function IssueDetailPage() {
                   Удалить
                 </Button>
               )}
-              {issue.priority?.name && <Badge variant="outline">{issue.priority.name}</Badge>}
+              {issue.priority?.name && (
+                <Badge variant="outline">{issue.priority.name}</Badge>
+              )}
               {issue.allowed_statuses && issue.allowed_statuses.length > 0 ? (
                 <Select
                   value={String(issue.status?.id ?? "")}
@@ -585,7 +698,9 @@ export function IssueDetailPage() {
                 </Select>
               ) : (
                 issue.status && (
-                  <Badge variant={issue.status.is_closed ? "secondary" : "default"}>
+                  <Badge
+                    variant={issue.status.is_closed ? "secondary" : "default"}
+                  >
                     {issue.status.name}
                   </Badge>
                 )
@@ -626,8 +741,14 @@ export function IssueDetailPage() {
                 )}
 
                 <div className="mt-4 flex items-center gap-2">
-                  <Button size="sm" onClick={handleSaveEdit} disabled={isSavingEdit}>
-                    {isSavingEdit && <Loader2 className="size-3.5 animate-spin" />}
+                  <Button
+                    size="sm"
+                    onClick={handleSaveEdit}
+                    disabled={isSavingEdit}
+                  >
+                    {isSavingEdit && (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    )}
                     Сохранить
                   </Button>
                   <Button
@@ -655,19 +776,31 @@ export function IssueDetailPage() {
                     )}
                   </Field>
                   <Field label="Автор">{issue.author?.name ?? "—"}</Field>
-                  <Field label="Исполнитель">{issue.assigned_to?.name ?? "—"}</Field>
+                  <Field label="Исполнитель">
+                    {issue.assigned_to?.name ?? "—"}
+                  </Field>
                   <Field label="Категория">{issue.category?.name ?? "—"}</Field>
-                  <Field label="Версия">{issue.fixed_version?.name ?? "—"}</Field>
+                  <Field label="Версия">
+                    {issue.fixed_version?.name ?? "—"}
+                  </Field>
                   <Field label="Начало">
                     {issue.start_date ? formatDate(issue.start_date) : "—"}
                   </Field>
-                  <Field label="Срок">{issue.due_date ? formatDate(issue.due_date) : "—"}</Field>
-                  <Field label="Обновлено">{formatDateTime(issue.updated_on)}</Field>
+                  <Field label="Срок">
+                    {issue.due_date ? formatDate(issue.due_date) : "—"}
+                  </Field>
+                  <Field label="Обновлено">
+                    {formatDateTime(issue.updated_on)}
+                  </Field>
                   <Field label="Оценка">
-                    {issue.estimated_hours != null ? `${issue.estimated_hours} ч` : "—"}
+                    {issue.estimated_hours != null
+                      ? `${issue.estimated_hours} ч`
+                      : "—"}
                   </Field>
                   <Field label="Потрачено">
-                    {issue.spent_hours != null ? `${issue.spent_hours.toFixed(2)} ч` : "—"}
+                    {issue.spent_hours != null
+                      ? `${issue.spent_hours.toFixed(2)} ч`
+                      : "—"}
                   </Field>
                   <div className="col-span-2 sm:col-span-3 lg:col-span-4">
                     <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
@@ -685,7 +818,9 @@ export function IssueDetailPage() {
                     <CardTitle>Описание</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{issue.description}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {issue.description}
+                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -698,11 +833,17 @@ export function IssueDetailPage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-5">
               <div>
-                <div className="mb-1.5 text-xs text-muted-foreground">Родительская задача</div>
+                <div className="mb-1.5 text-xs text-muted-foreground">
+                  Родительская задача
+                </div>
                 {issue.parent?.id ? (
                   <div className="flex items-center gap-2">
-                    <Link to={`/issues/${issue.parent.id}`} className="text-sm hover:underline">
-                      #{issue.parent.id} — {relatedSummaries[issue.parent.id]?.subject ?? "..."}
+                    <Link
+                      to={`/issues/${issue.parent.id}`}
+                      className="text-sm hover:underline"
+                    >
+                      #{issue.parent.id} —{" "}
+                      {relatedSummaries[issue.parent.id]?.subject ?? "..."}
                     </Link>
                     <Button
                       size="sm"
@@ -723,8 +864,14 @@ export function IssueDetailPage() {
                       value={parentInput}
                       onChange={(e) => setParentInput(e.target.value)}
                     />
-                    <Button size="sm" onClick={handleSetParent} disabled={isSavingParent}>
-                      {isSavingParent && <Loader2 className="size-3.5 animate-spin" />}
+                    <Button
+                      size="sm"
+                      onClick={handleSetParent}
+                      disabled={isSavingParent}
+                    >
+                      {isSavingParent && (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      )}
                       Указать
                     </Button>
                     <Button
@@ -751,16 +898,23 @@ export function IssueDetailPage() {
                     Указать родителя
                   </Button>
                 )}
-                {parentError && <p className="mt-1 text-xs text-destructive">{parentError}</p>}
+                {parentError && (
+                  <p className="mt-1 text-xs text-destructive">{parentError}</p>
+                )}
               </div>
 
               <div>
-                <div className="mb-1.5 text-xs text-muted-foreground">Подзадачи</div>
+                <div className="mb-1.5 text-xs text-muted-foreground">
+                  Подзадачи
+                </div>
                 {issue.children && issue.children.length > 0 ? (
                   <ul className="flex flex-col gap-1">
                     {issue.children.map((c, i) => (
                       <li key={c.id ?? i}>
-                        <Link to={`/issues/${c.id}`} className="text-sm hover:underline">
+                        <Link
+                          to={`/issues/${c.id}`}
+                          className="text-sm hover:underline"
+                        >
                           #{c.id} — {c.subject ?? "—"}
                         </Link>
                       </li>
@@ -783,16 +937,22 @@ export function IssueDetailPage() {
                     onClick={handleAddChild}
                     disabled={isAddingChild}
                   >
-                    {isAddingChild && <Loader2 className="size-3.5 animate-spin" />}
+                    {isAddingChild && (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    )}
                     <Plus className="size-3.5" />
                     Добавить подзадачу
                   </Button>
                 </div>
-                {childError && <p className="mt-1 text-xs text-destructive">{childError}</p>}
+                {childError && (
+                  <p className="mt-1 text-xs text-destructive">{childError}</p>
+                )}
               </div>
 
               <div>
-                <div className="mb-1.5 text-xs text-muted-foreground">Связанные задачи</div>
+                <div className="mb-1.5 text-xs text-muted-foreground">
+                  Связанные задачи
+                </div>
                 {issue.relations && issue.relations.length > 0 ? (
                   <ul className="flex flex-col gap-1.5">
                     {issue.relations.map((r, i) => {
@@ -802,13 +962,22 @@ export function IssueDetailPage() {
                       const label = isForward
                         ? RELATION_TYPE_LABELS[type]
                         : RELATION_TYPE_LABELS[RELATION_TYPE_INVERSE[type]];
-                      const otherSummary = otherId != null ? relatedSummaries[otherId] : undefined;
+                      const otherSummary =
+                        otherId != null ? relatedSummaries[otherId] : undefined;
                       return (
-                        <li key={r.id ?? i} className="flex items-center justify-between gap-2">
+                        <li
+                          key={r.id ?? i}
+                          className="flex items-center justify-between gap-2"
+                        >
                           <span className="text-sm">
-                            <span className="text-muted-foreground">{label}:</span>{" "}
+                            <span className="text-muted-foreground">
+                              {label}:
+                            </span>{" "}
                             {otherId != null ? (
-                              <Link to={`/issues/${otherId}`} className="hover:underline">
+                              <Link
+                                to={`/issues/${otherId}`}
+                                className="hover:underline"
+                              >
                                 #{otherId} — {otherSummary?.subject ?? "..."}
                               </Link>
                             ) : (
@@ -819,8 +988,12 @@ export function IssueDetailPage() {
                             size="sm"
                             variant="ghost"
                             className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
-                            onClick={() => r.id != null && handleRemoveRelation(r.id)}
-                            disabled={r.id == null || removingRelationId === r.id}
+                            onClick={() =>
+                              r.id != null && handleRemoveRelation(r.id)
+                            }
+                            disabled={
+                              r.id == null || removingRelationId === r.id
+                            }
                             aria-label="Удалить связь"
                           >
                             {removingRelationId === r.id ? (
@@ -839,7 +1012,9 @@ export function IssueDetailPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Select
                     value={relationType}
-                    onValueChange={(v) => setRelationType(v as IssueRelationType)}
+                    onValueChange={(v) =>
+                      setRelationType(v as IssueRelationType)
+                    }
                   >
                     <SelectTrigger className="w-44">
                       <SelectValue />
@@ -865,12 +1040,18 @@ export function IssueDetailPage() {
                     onClick={handleAddRelation}
                     disabled={isAddingRelation}
                   >
-                    {isAddingRelation && <Loader2 className="size-3.5 animate-spin" />}
+                    {isAddingRelation && (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    )}
                     <Plus className="size-3.5" />
                     Добавить связь
                   </Button>
                 </div>
-                {relationError && <p className="mt-1 text-xs text-destructive">{relationError}</p>}
+                {relationError && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {relationError}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -883,7 +1064,10 @@ export function IssueDetailPage() {
               {issue.attachments && issue.attachments.length > 0 ? (
                 <ul className="flex flex-col gap-2">
                   {issue.attachments.map((a) => (
-                    <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                    <li
+                      key={a.id}
+                      className="flex items-center justify-between gap-2 text-sm"
+                    >
                       <button
                         type="button"
                         className="flex min-w-0 items-center gap-1.5 text-left hover:underline disabled:opacity-50"
@@ -942,7 +1126,9 @@ export function IssueDetailPage() {
                   Прикрепить файл
                 </Button>
                 {attachmentError && (
-                  <p className="mt-1 text-xs text-destructive">{attachmentError}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {attachmentError}
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -953,7 +1139,8 @@ export function IssueDetailPage() {
               <CardTitle>Наблюдатели</CardTitle>
               {user &&
                 (() => {
-                  const isSelfWatching = issue.watchers?.some((w) => w.id === user.id) ?? false;
+                  const isSelfWatching =
+                    issue.watchers?.some((w) => w.id === user.id) ?? false;
                   return (
                     <Button
                       size="sm"
@@ -978,7 +1165,10 @@ export function IssueDetailPage() {
               {issue.watchers && issue.watchers.length > 0 ? (
                 <ul className="flex flex-col gap-1.5">
                   {issue.watchers.map((w) => (
-                    <li key={w.id} className="flex items-center justify-between gap-2">
+                    <li
+                      key={w.id}
+                      className="flex items-center justify-between gap-2"
+                    >
                       <span className="text-sm">{w.name}</span>
                       <Button
                         size="sm"
@@ -1007,7 +1197,9 @@ export function IssueDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {members
-                      .filter((m) => !issue.watchers?.some((w) => w.id === m.id))
+                      .filter(
+                        (m) => !issue.watchers?.some((w) => w.id === m.id),
+                      )
                       .map((m) => (
                         <SelectItem key={m.id} value={String(m.id)}>
                           {m.name}
@@ -1022,12 +1214,16 @@ export function IssueDetailPage() {
                   onClick={() => handleAddWatcher(Number(watcherInput))}
                   disabled={!watcherInput || isAddingWatcher}
                 >
-                  {isAddingWatcher && <Loader2 className="size-3.5 animate-spin" />}
+                  {isAddingWatcher && (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  )}
                   <Plus className="size-3.5" />
                   Добавить наблюдателя
                 </Button>
               </div>
-              {watcherError && <p className="text-xs text-destructive">{watcherError}</p>}
+              {watcherError && (
+                <p className="text-xs text-destructive">{watcherError}</p>
+              )}
             </CardContent>
           </Card>
 
@@ -1051,7 +1247,10 @@ export function IssueDetailPage() {
             </CardHeader>
             <CardContent>
               <span className="text-sm text-muted-foreground">
-                Потрачено всего: {issue.spent_hours != null ? `${issue.spent_hours.toFixed(2)} ч` : "0 ч"}
+                Потрачено всего:{" "}
+                {issue.spent_hours != null
+                  ? `${issue.spent_hours.toFixed(2)} ч`
+                  : "0 ч"}
               </span>
             </CardContent>
           </Card>
@@ -1063,9 +1262,13 @@ export function IssueDetailPage() {
             <CardContent className="flex flex-col gap-3">
               <div className="flex flex-col">
                 {issue.journals && issue.journals.length > 0 ? (
-                  issue.journals.map((j) => <JournalEntry key={j.id} journal={j} />)
+                  issue.journals.map((j) => (
+                    <JournalEntry key={j.id} journal={j} />
+                  ))
                 ) : (
-                  <p className="py-2 text-sm text-muted-foreground">Пока пусто</p>
+                  <p className="py-2 text-sm text-muted-foreground">
+                    Пока пусто
+                  </p>
                 )}
               </div>
 
@@ -1074,6 +1277,12 @@ export function IssueDetailPage() {
                   placeholder="Добавить комментарий..."
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddComment();
+                    }
+                  }}
                 />
                 <Button
                   size="sm"
@@ -1081,7 +1290,9 @@ export function IssueDetailPage() {
                   disabled={!comment.trim() || isSavingComment}
                   onClick={handleAddComment}
                 >
-                  {isSavingComment && <Loader2 className="size-3.5 animate-spin" />}
+                  {isSavingComment && (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  )}
                   Добавить
                 </Button>
               </div>

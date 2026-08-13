@@ -72,7 +72,10 @@ export function GlobalSearch({ client }: GlobalSearchProps) {
   }
 
   return (
-    <Command shouldFilter={false} className="relative h-auto overflow-visible bg-transparent p-0">
+    <Command
+      shouldFilter={false}
+      className="relative h-auto overflow-visible bg-transparent p-0"
+    >
       <CommandInput
         placeholder="Поиск..."
         value={query}
