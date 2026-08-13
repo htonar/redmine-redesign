@@ -122,17 +122,24 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex w-72 shrink-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2",
+        "flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2",
         isOver && "border-primary bg-primary/5",
       )}
     >
-      <div className="flex items-center justify-between gap-2 px-1 pt-1">
+      <div className="flex shrink-0 items-center justify-between gap-2 px-1 pt-1">
         <div className="flex items-center gap-1.5">
           <Badge variant={isClosed ? "secondary" : "default"}>{title}</Badge>
         </div>
         <span className="text-xs text-muted-foreground">{issues.length}</span>
       </div>
-      <div className="flex flex-col gap-2">
+      {/* min-h-0 - иначе flex-контейнер не даст себе сжаться и overflow-y-auto
+          не сработает (карточки просто раздвинут колонку по высоте, тот же
+          эффект, от которого уходим - см. CLAUDE.md, "Канбан: фиксированная
+          высота"). */}
+      <div
+        data-kanban-column-scroll
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+      >
         {issues.map((issue) => (
           <KanbanCard
             key={issue.id}
@@ -249,6 +256,27 @@ export function KanbanBoard({
     }
   }
 
+  // Горизонтальный overflow-x-auto по умолчанию не реагирует на колесо мыши
+  // (только на drag за сам скроллбар) - пользователь на это пожаловался.
+  // Переводим вертикальный wheel в горизонтальный скролл доски, но только
+  // если курсор не над списком карточек колонки (data-kanban-column-scroll)
+  // - тот скроллится вертикально сам по себе нативно, перехватывать не надо.
+  function handleBoardWheel(e: React.WheelEvent<HTMLDivElement>) {
+    if (e.deltaY === 0) return;
+    const columnScroll = (e.target as HTMLElement).closest<HTMLElement>(
+      "[data-kanban-column-scroll]",
+    );
+    // Если под курсором список карточек колонки и там реально есть что
+    // скроллить вертикально - не мешаем, пусть скроллится нативно. Если
+    // список короткий (скроллить нечего) или курсор вне списка (шапка
+    // колонки, зазор между колонками) - переводим wheel в горизонтальный
+    // скролл доски.
+    if (columnScroll && columnScroll.scrollHeight > columnScroll.clientHeight) {
+      return;
+    }
+    e.currentTarget.scrollLeft += e.deltaY;
+  }
+
   if (statusesLoading || isLoading) {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
@@ -276,7 +304,14 @@ export function KanbanBoard({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        {/* Фиксированная высота (не max-h) - иначе высота доски "гуляет"
+            вместе с числом карточек в самой заполненной колонке (была ragged
+            и непредсказуемая - см. CLAUDE.md). Колонки скроллятся по
+            вертикали независимо друг от друга, доска - по горизонтали. */}
+        <div
+          className="flex h-[70vh] gap-3 overflow-x-auto pb-2"
+          onWheel={handleBoardWheel}
+        >
           {columns.map(({ status, issues: columnIssues }) => (
             <KanbanColumn
               key={status.id}
