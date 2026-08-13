@@ -11,6 +11,9 @@
  * brand - красный, брендовый акцент Redmine: логотип, важные бейджи, destructive.
  * cyan - вторичный акцент: графики, progress-бары, readiness-полосы.
  * success - зеленый: положительные тренды и статусы.
+ * warning - янтарный: статус "требует внимания, но не критично" (например
+ *   недотрекано время за день) - отдельно от destructive, у которого
+ *   смысл жёстче ("ошибка/удаление").
  * sidebar-* - темно-синяя палитра левого сайдбара, отдельная от светлого контента.
  */
 :root {
@@ -47,6 +50,8 @@
   --cyan-foreground: #0b2b33;
   --success: #3ecf6e;
   --success-foreground: #063d1a;
+  --warning: #f59e0b;
+  --warning-foreground: #451a03;
 
   --chart-1: #29c1e0;
   --chart-2: #2f6fed;
@@ -108,6 +113,8 @@
   --cyan-foreground: #0b2b33;
   --success: #52dd82;
   --success-foreground: #063d1a;
+  --warning: #fbbf24;
+  --warning-foreground: #451a03;
 
   --chart-1: #4fd1e8;
   --chart-2: #4d84f5;
@@ -154,6 +161,8 @@
   --color-cyan-foreground: var(--cyan-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);

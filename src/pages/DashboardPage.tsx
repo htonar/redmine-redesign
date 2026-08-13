@@ -15,8 +15,12 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { listIssues, type IssueSummary } from "@/api/issues";
+import { createTimeEntry, type TimeEntryInput } from "@/api/timeEntries";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { WeeklyTimeDebtWidget } from "@/components/time/WeeklyTimeDebtWidget";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
+import { useProjects } from "@/hooks/useProjects";
+import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
 import { useLayoutContext } from "./AppLayout";
 
 function formatDate(iso: string): string {
@@ -47,6 +51,13 @@ export function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const activity = useActivityFeed(client, selectedProjectId ?? undefined);
+  const { projects } = useProjects(client);
+  const { activities } = useTimeEntryActivities(client);
+
+  async function handleLogTime(input: TimeEntryInput) {
+    if (!client) return;
+    await createTimeEntry(client, input);
+  }
 
   useEffect(() => {
     if (!client) return;
@@ -99,6 +110,14 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <WeeklyTimeDebtWidget
+        client={client}
+        projects={projects}
+        activities={activities}
+        defaultProjectId={selectedProjectId}
+        onLogTime={handleLogTime}
+      />
+
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>

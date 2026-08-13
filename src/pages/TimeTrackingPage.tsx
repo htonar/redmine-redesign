@@ -20,6 +20,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LogTimeDialog, type LogTimeDialogInitial } from "@/components/time/LogTimeDialog";
+import { WeeklyTimeDebtWidget } from "@/components/time/WeeklyTimeDebtWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
@@ -143,6 +144,14 @@ export function TimeTrackingPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <WeeklyTimeDebtWidget
+        client={client}
+        projects={projects}
+        activities={activities}
+        defaultProjectId={selectedProjectId}
+        onLogTime={handleCreate}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Select value={scope} onValueChange={(v) => setScope(v as typeof scope)}>
@@ -170,6 +179,7 @@ export function TimeTrackingPage() {
         </div>
 
         <LogTimeDialog
+          client={client}
           projects={projects}
           activities={activities}
           defaultProjectId={selectedProjectId}
@@ -254,6 +264,7 @@ export function TimeTrackingPage() {
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
                           <LogTimeDialog
+                            client={client}
                             projects={projects}
                             activities={activities}
                             initial={editInitial(entry)}

@@ -20,6 +20,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { IssuePicker } from "@/components/time/IssuePicker";
+import type { RedmineClient } from "@/api/client";
 import type { Project } from "@/hooks/useProjects";
 import type { TimeEntryActivity } from "@/hooks/useTimeEntryActivities";
 import type { TimeEntryInput } from "@/api/timeEntries";
@@ -35,12 +37,15 @@ export interface LogTimeDialogInitial {
 
 export interface LogTimeDialogProps {
   trigger: ReactNode;
+  client: RedmineClient | null;
   projects: Project[];
   activities: TimeEntryActivity[];
   /** Проект по умолчанию для новой записи - например, текущий фильтр в Topbar. */
   defaultProjectId?: number | null;
   /** Задача по умолчанию для новой записи - например, открытая карточка задачи. */
   defaultIssueId?: number;
+  /** Дата по умолчанию для новой записи (YYYY-MM-DD) - например, день с недотрекой из WeeklyTimeDebtWidget. Игнорируется в режиме правки (там дата из initial). */
+  defaultSpentOn?: string;
   /** Если задано - форма открывается в режиме правки существующей записи. */
   initial?: LogTimeDialogInitial;
   onSubmit: (input: TimeEntryInput) => Promise<void>;
@@ -64,16 +69,18 @@ function defaultActivityId(activities: TimeEntryActivity[]): number | null {
  */
 export function LogTimeDialog({
   trigger,
+  client,
   projects,
   activities,
   defaultProjectId,
   defaultIssueId,
+  defaultSpentOn,
   initial,
   onSubmit,
 }: LogTimeDialogProps) {
   const isEditing = Boolean(initial);
   const [open, setOpen] = useState(false);
-  const [issueId, setIssueId] = useState("");
+  const [issueId, setIssueId] = useState<number | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [spentOn, setSpentOn] = useState(todayIsoDate());
   const [hours, setHours] = useState("");
@@ -90,11 +97,9 @@ export function LogTimeDialog({
   const commentsFieldId = useId();
 
   function resetForm() {
-    setIssueId(
-      initial?.issueId ? String(initial.issueId) : defaultIssueId ? String(defaultIssueId) : "",
-    );
+    setIssueId(initial?.issueId ?? defaultIssueId ?? null);
     setProjectId(initial?.projectId ?? defaultProjectId ?? null);
-    setSpentOn(initial?.spentOn ?? todayIsoDate());
+    setSpentOn(initial?.spentOn ?? defaultSpentOn ?? todayIsoDate());
     setHours(initial?.hours !== undefined ? String(initial.hours) : "");
     setActivityId(initial?.activityId ?? defaultActivityId(activities));
     setComments(initial?.comments ?? "");
@@ -110,11 +115,9 @@ export function LogTimeDialog({
     e.preventDefault();
     setFormError(null);
 
-    const trimmedIssueId = issueId.trim();
-    const parsedIssueId = trimmedIssueId ? Number(trimmedIssueId) : undefined;
     const parsedHours = Number(hours.replace(",", "."));
 
-    if (!parsedIssueId && !projectId) {
+    if (!issueId && !projectId) {
       setFormError("Укажите задачу или проект.");
       return;
     }
@@ -126,7 +129,7 @@ export function LogTimeDialog({
     setIsSubmitting(true);
     try {
       await onSubmit({
-        issueId: parsedIssueId,
+        issueId: issueId ?? undefined,
         projectId: projectId ?? undefined,
         spentOn,
         hours: parsedHours,
@@ -157,15 +160,13 @@ export function LogTimeDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor={issueFieldId} className="mb-1.5">
-                № задачи
+                Задача
               </Label>
-              <Input
-                id={issueFieldId}
-                type="number"
-                min={1}
-                placeholder="например, 1234"
+              <IssuePicker
+                client={client}
                 value={issueId}
-                onChange={(e) => setIssueId(e.target.value)}
+                onChange={setIssueId}
+                projectId={projectId}
               />
             </div>
             <div>
@@ -209,7 +210,16 @@ export function LogTimeDialog({
               <Input
                 id={hoursFieldId}
                 type="number"
-                min={0.01}
+                // min=0, не 0.01: у <input type=number step=0.25> браузер
+                // считает допустимыми только min + n*step - с min=0.01 это
+                // 0.01, 0.26, 0.51, ... 4.76, 5.01, ... т.е. почти ни одно
+                // круглое число (5, 8...) не проходит нативную HTML-валидацию
+                // (submit тихо блокируется, form.requestSubmit() показывает
+                // "nearest valid values are 4.76 and 5.01") - найдено на
+                // практике при проверке WeeklyTimeDebtWidget. Ноль/отрицательные
+                // отсекает JS-проверка ниже (parsedHours <= 0), min тут только
+                // подсказка браузерному спиннеру, не источник правды.
+                min={0}
                 step={0.25}
                 placeholder="например, 1.5"
                 value={hours}
