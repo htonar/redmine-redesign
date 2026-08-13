@@ -86,17 +86,43 @@ app.all("/proxy/*", async (c) => {
 
   const hasBody = !["GET", "HEAD"].includes(c.req.method);
 
-  const upstreamResponse = await fetch(forwardUrl, {
-    method: c.req.method,
-    headers,
-    body: hasBody ? await c.req.arrayBuffer() : undefined,
-  });
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetch(forwardUrl, {
+      method: c.req.method,
+      headers,
+      body: hasBody ? await c.req.arrayBuffer() : undefined,
+    });
+  } catch (err) {
+    console.error("Ошибка запроса к Redmine:", err);
+    return c.json({ error: "Не удалось связаться с Redmine." }, 502);
+  }
 
   const responseHeaders = new Headers();
   const contentType = upstreamResponse.headers.get("content-type");
   if (contentType) responseHeaders.set("content-type", contentType);
 
-  return new Response(upstreamResponse.body, {
+  // 204/205/304 обязаны идти с пустым телом - Response-конструктор в Node
+  // (undici) кидает исключение, если передать body (даже пустой
+  // ReadableStream - upstreamResponse.body им и является всегда, не null)
+  // вместе с таким статусом. Без этой развилки любой такой ответ Redmine
+  // (например DELETE .../watchers/{id}.json, который в норме отвечает 204)
+  // ронял прокси и клиент вместо реального статуса видел 503, хотя запрос
+  // на самом деле выполнился.
+  const isEmptyBodyStatus = [204, 205, 304].includes(upstreamResponse.status);
+
+  if (isEmptyBodyStatus) {
+    // Просто отбросить upstreamResponse.body (ReadableStream) недостаточно -
+    // undici не считает соединение свободным, пока поток тела явно не
+    // прочитан или не отменен. Оставленный "висеть" поток порчит keep-alive
+    // соединение в пуле, и уже СЛЕДУЮЩИЙ запрос через него падает - отсюда
+    // была нестабильность: одни и те же вотчер-запросы отвечали то 204, то
+    // 503 без единой закономерности в коде. Явная отмена возвращает
+    // соединение в пул чистым.
+    await upstreamResponse.body?.cancel();
+  }
+
+  return new Response(isEmptyBodyStatus ? null : upstreamResponse.body, {
     status: upstreamResponse.status,
     headers: responseHeaders,
   });

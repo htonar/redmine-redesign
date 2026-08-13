@@ -55,12 +55,21 @@ export async function listIssues(
   return { issues: data.issues, totalCount: data.total_count ?? data.issues.length };
 }
 
-/** Карточка задачи - все поля + история изменений и доступные для текущего пользователя переходы статуса. */
+/** Карточка задачи - все поля + история изменений, подзадачи, связи и доступные для текущего пользователя переходы статуса. */
 export async function getIssue(client: RedmineClient, id: number): Promise<Issue> {
   const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
     params: {
       path: { format: "json", issue_id: id },
-      query: { include: ["journals", "allowed_statuses"] },
+      query: {
+        include: [
+          "journals",
+          "allowed_statuses",
+          "children",
+          "relations",
+          "attachments",
+          "watchers",
+        ],
+      },
     },
   });
 
@@ -69,6 +78,46 @@ export async function getIssue(client: RedmineClient, id: number): Promise<Issue
   }
 
   return data.issue;
+}
+
+/**
+ * Краткая карточка задачи (тема/трекер/статус/проект), без include - для
+ * отображения ссылки на родителя/связанную задачу, когда есть только её id
+ * (issue.parent и issue.relations отдают только { id }, без темы).
+ */
+export async function getIssueSummary(client: RedmineClient, id: number): Promise<IssueSummary> {
+  const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
+    params: { path: { format: "json", issue_id: id } },
+  });
+
+  if (error || !data) {
+    throw new Error(`Не удалось загрузить задачу #${id}.`);
+  }
+
+  return data.issue;
+}
+
+export type IssueJournal = NonNullable<Issue["journals"]>[number];
+
+/**
+ * Только история изменений задачи (без остальных include) - для ленты
+ * активности на дашборде (useActivityFeed), где нужны journals по нескольким
+ * задачам сразу и лишние include (attachments, relations, watchers...)
+ * только увеличили бы вес запроса без пользы.
+ */
+export async function getIssueJournal(
+  client: RedmineClient,
+  id: number,
+): Promise<{ issue: IssueSummary; journals: IssueJournal[] }> {
+  const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
+    params: { path: { format: "json", issue_id: id }, query: { include: ["journals"] } },
+  });
+
+  if (error || !data) {
+    throw new Error(`Не удалось загрузить историю задачи #${id}.`);
+  }
+
+  return { issue: data.issue, journals: data.issue.journals ?? [] };
 }
 
 /**
@@ -90,6 +139,16 @@ export interface IssueFieldsInput {
   dueDate?: string | null;
   doneRatio?: number;
   estimatedHours?: number | null;
+  /** Родительская задача (подзадача чего-то) - `null` явно убирает родителя. */
+  parentId?: number | null;
+  /**
+   * Новые файлы для прикрепления - сначала грузятся байты через
+   * uploadAttachment (src/api/attachments.ts, POST /uploads), затем
+   * полученный token передается сюда вместе с create/update. Удаление уже
+   * прикрепленного файла - отдельный DELETE /attachments/{id}
+   * (deleteAttachment), не через этот массив.
+   */
+  uploads?: { token: string; filename: string; contentType?: string }[];
 }
 
 export interface IssueCreateInput extends IssueFieldsInput {
@@ -119,6 +178,12 @@ export async function createIssue(
         due_date: input.dueDate,
         done_ratio: input.doneRatio,
         estimated_hours: input.estimatedHours,
+        parent_issue_id: input.parentId,
+        uploads: input.uploads?.map((u) => ({
+          token: u.token,
+          filename: u.filename,
+          content_type: u.contentType,
+        })),
       },
     },
   });
@@ -162,6 +227,12 @@ export async function updateIssue(
         due_date: input.dueDate,
         done_ratio: input.doneRatio,
         estimated_hours: input.estimatedHours,
+        parent_issue_id: input.parentId,
+        uploads: input.uploads?.map((u) => ({
+          token: u.token,
+          filename: u.filename,
+          content_type: u.contentType,
+        })),
       },
     },
   });
@@ -187,5 +258,62 @@ export async function deleteIssue(client: RedmineClient, id: number): Promise<vo
       throw new Error("Недостаточно прав для удаления этой задачи.");
     }
     throw new Error("Не удалось удалить задачу.");
+  }
+}
+
+export type IssueRelationType =
+  | "relates"
+  | "duplicates"
+  | "duplicated"
+  | "blocks"
+  | "blocked"
+  | "precedes"
+  | "follows"
+  | "copied_to"
+  | "copied_from";
+
+export type IssueRelation = components["schemas"]["issue_relation"];
+
+export interface IssueRelationInput {
+  issueToId: number;
+  relationType: IssueRelationType;
+  delay?: number | null;
+}
+
+/** Добавление связи между текущей задачей и другой - см. CLAUDE.md, "Подзадачи и связи задач". */
+export async function createIssueRelation(
+  client: RedmineClient,
+  issueId: number,
+  input: IssueRelationInput,
+): Promise<IssueRelation> {
+  const { data, error } = await client.POST("/issues/{issue_id}/relations.{format}", {
+    params: { path: { format: "json", issue_id: issueId } },
+    body: {
+      relation: {
+        issue_to_id: input.issueToId,
+        relation_type: input.relationType,
+        delay: input.delay ?? undefined,
+      },
+    },
+  });
+
+  if (error || !data) {
+    throw new Error("Не удалось добавить связь - проверьте номер задачи.");
+  }
+
+  return data.relation;
+}
+
+/** Удаление связи по id самой связи (не задачи). */
+export async function deleteIssueRelation(
+  client: RedmineClient,
+  relationId: number,
+): Promise<void> {
+  const { error } = await client.DELETE("/relations/{issue_relation_id}.{format}", {
+    params: { path: { format: "json", issue_relation_id: relationId } },
+  });
+
+  if (error) {
+    throw new Error("Не удалось удалить связь.");
   }
 }

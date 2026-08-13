@@ -27,6 +27,7 @@ export function AppLayout() {
   return (
     <TooltipProvider delayDuration={200}>
       <AppShell
+        client={client}
         projects={projects}
         projectsLoading={projectsLoading}
         selectedProjectId={selectedProjectId}
@@ -34,6 +35,7 @@ export function AppLayout() {
         user={{
           name: `${user.firstname} ${user.lastname}`,
           initials: initials(user.firstname, user.lastname),
+          email: user.mail,
         }}
         onLogout={logout}
         theme={theme}

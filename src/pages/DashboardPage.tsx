@@ -15,6 +15,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { listIssues, type IssueSummary } from "@/api/issues";
+import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { useLayoutContext } from "./AppLayout";
 
 function formatDate(iso: string): string {
@@ -44,6 +46,7 @@ export function DashboardPage() {
   const [recent, setRecent] = useState<IssueSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const activity = useActivityFeed(client, selectedProjectId ?? undefined);
 
   useEffect(() => {
     if (!client) return;
@@ -155,6 +158,26 @@ export function DashboardPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b">
+          <CardTitle>Активность</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          {activity.error ? (
+            <Alert variant="destructive" className="mx-4 my-4">
+              <AlertDescription>{activity.error}</AlertDescription>
+            </Alert>
+          ) : activity.isLoading ? (
+            <div className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Загрузка...
+            </div>
+          ) : (
+            <ActivityFeed entries={activity.entries} />
           )}
         </CardContent>
       </Card>

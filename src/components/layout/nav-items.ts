@@ -1,14 +1,4 @@
-import {
-  BarChart3,
-  ClipboardList,
-  Clock,
-  Folder,
-  Mail,
-  PencilLine,
-  Target,
-  User,
-  type LucideIcon,
-} from 'lucide-react'
+import { BarChart3, Clock, Folder, PencilLine, User, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   id: string
@@ -18,14 +8,17 @@ export interface NavItem {
   path?: string
 }
 
-/** Пункты левого сайдбара - см. docs/design.md, раздел "Компоненты, встреченные в макетах". */
+/**
+ * Пункты левого сайдбара - см. docs/design.md, раздел "Компоненты, встреченные
+ * в макетах". "Сообщения", "Отчеты" и "Цели" из референса сюда сознательно не
+ * входят - решили вырезать их до появления ясности, что каждый из них значит
+ * в нашем случае (см. CLAUDE.md, "Бэклог: пустые пункты сайдбара/топбара" -
+ * там же зафиксировано, почему именно эти три отложены, а не Файлы/Профиль).
+ */
 export const navItems: NavItem[] = [
-  { id: 'profile', label: 'Профиль', icon: User },
-  { id: 'messages', label: 'Сообщения', icon: Mail },
+  { id: 'profile', label: 'Профиль', icon: User, path: '/profile' },
   { id: 'time', label: 'Учет времени', icon: Clock, path: '/time' },
   { id: 'activity', label: 'Активность', icon: BarChart3, path: '/dashboard' },
   { id: 'tasks', label: 'Задачи', icon: PencilLine, path: '/issues' },
-  { id: 'reports', label: 'Отчеты', icon: ClipboardList },
-  { id: 'goals', label: 'Цели', icon: Target },
-  { id: 'files', label: 'Файлы', icon: Folder },
+  { id: 'files', label: 'Файлы', icon: Folder, path: '/files' },
 ]

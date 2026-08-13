@@ -1,6 +1,6 @@
-import { ChevronDown, Moon, Search, Sun } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { ChevronDown, Moon, Sun } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -8,14 +8,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { GlobalSearch } from '@/components/layout/GlobalSearch'
 import type { Project } from '@/hooks/useProjects'
+import { getGravatarUrl } from '@/lib/gravatar'
+import type { RedmineClient } from '@/api/client'
 
 export interface CurrentUser {
   name: string
   initials: string
+  email: string
 }
 
 export interface TopbarProps {
+  client: RedmineClient | null
   projects: Project[]
   projectsLoading: boolean
   /** null - фильтр "Все проекты". */
@@ -29,6 +34,7 @@ export interface TopbarProps {
 
 /** Верхняя панель рабочей области: поиск, переключатель проекта, пользователь. */
 export function Topbar({
+  client,
   projects,
   projectsLoading,
   selectedProjectId,
@@ -38,14 +44,14 @@ export function Topbar({
   theme,
   onToggleTheme,
 }: TopbarProps) {
+  const navigate = useNavigate()
   const currentProjectName =
     projects.find((p) => p.id === selectedProjectId)?.name ?? 'Все проекты'
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4">
-      <div className="relative w-full max-w-sm">
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Поиск..." className="pl-8" />
+      <div className="w-full max-w-sm">
+        <GlobalSearch client={client} />
       </div>
 
       <div className="ml-auto flex items-center gap-3">
@@ -93,6 +99,7 @@ export function Topbar({
             >
               <span className="text-sm font-medium">{user.name}</span>
               <Avatar className="size-8">
+                <AvatarImage src={getGravatarUrl(user.email, 64)} alt={user.name} />
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {user.initials}
                 </AvatarFallback>
@@ -100,8 +107,7 @@ export function Topbar({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Профиль</DropdownMenuItem>
-            <DropdownMenuItem>Настройки</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate('/profile')}>Профиль</DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onSelect={onLogout}>
               Выйти
             </DropdownMenuItem>
