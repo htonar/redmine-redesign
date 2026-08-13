@@ -54,6 +54,15 @@ jobs:
       - name: Set version
         run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
 
+      # npm version выше трогает только package.json. tauri.conf.json
+      # намеренно без своего "version" (см. ниже) - но Tauri в этом случае
+      # падает обратно на версию из src-tauri/Cargo.toml, а не package.json,
+      # так что без этого шага бандл собирался бы со старой версией
+      # Cargo.toml независимо от введенной здесь версии (баг, найден и
+      # исправлен - см. CLAUDE.md).
+      - name: Sync Tauri (Cargo.toml) version
+        run: node scripts/sync-tauri-version.mjs "${{ inputs.version }}"
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22
