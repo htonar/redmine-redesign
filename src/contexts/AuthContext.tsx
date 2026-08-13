@@ -9,6 +9,11 @@ import {
 } from "react";
 import { createRedmineClient, type RedmineClient } from "@/api/client";
 import {
+  fetchPermissions,
+  type ProjectRoles,
+  type RolePermissions,
+} from "@/api/permissions";
+import {
   clearCredentials,
   loadCredentials,
   normalizeBaseUrl,
@@ -21,6 +26,7 @@ export interface AuthUser {
   firstname: string;
   lastname: string;
   mail: string;
+  admin: boolean;
 }
 
 type AuthStatus = "restoring" | "anonymous" | "authenticating" | "authenticated";
@@ -35,6 +41,16 @@ interface AuthContextValue {
   error: string | null;
   login: (baseUrl: string, apiKey: string) => Promise<void>;
   logout: () => void;
+  /**
+   * Есть ли у текущего пользователя право `permission` (машинный ключ Redmine,
+   * например "delete_issues") на проекте `projectId` - см. docs/permissions.md.
+   * Пока права не загрузились (permissionsLoading) - возвращает false, чтобы
+   * не показывать контролы, которые сразу же придется прятать обратно.
+   * Админ (`user.admin`) обходит проверку - ему можно всё.
+   */
+  can: (permission: string, projectId: number | null | undefined) => boolean;
+  /** Права грузятся отдельным запросом после логина - см. loadPermissions. */
+  permissionsLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -88,6 +104,7 @@ async function fetchAccount(client: RedmineClient): Promise<AuthUser> {
     firstname: user.firstname,
     lastname: user.lastname,
     mail: user.mail,
+    admin: user.admin ?? false,
   };
 }
 
@@ -97,6 +114,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [client, setClient] = useState<RedmineClient | null>(null);
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [projectRoles, setProjectRoles] = useState<ProjectRoles>({});
+  const [rolePermissions, setRolePermissions] = useState<RolePermissions>({});
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
+
+  /**
+   * Отдельный запрос после успешного логина/восстановления сессии - права не
+   * нужны для самого входа, поэтому не блокируют его. Админа не запрашиваем -
+   * ему можно всё, can() полагается на account.admin напрямую.
+   */
+  function loadPermissions(activeClient: RedmineClient, isAdmin: boolean) {
+    if (isAdmin) {
+      setProjectRoles({});
+      setRolePermissions({});
+      return;
+    }
+    setPermissionsLoading(true);
+    fetchPermissions(activeClient)
+      .then(({ projectRoles, rolePermissions }) => {
+        setProjectRoles(projectRoles);
+        setRolePermissions(rolePermissions);
+      })
+      .catch(() => {
+        // Права - только для UX (прятать недоступные кнопки), не критично для
+        // работы приложения - молча оставляем пустыми, can() вернет false.
+      })
+      .finally(() => setPermissionsLoading(false));
+  }
 
   useEffect(() => {
     const stored = loadCredentials();
@@ -117,6 +161,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setUser(account);
         setBaseUrl(stored.baseUrl);
         setStatus("authenticated");
+        loadPermissions(restoredClient, account.admin);
       })
       .catch(() => {
         // сохраненный ключ больше не работает - тихо очищаем и просим войти заново
@@ -143,6 +188,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setUser(account);
       setBaseUrl(baseUrl);
       setStatus("authenticated");
+      loadPermissions(newClient, account.admin);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось войти.");
       setStatus("anonymous");
@@ -156,11 +202,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setBaseUrl(null);
     setError(null);
     setStatus("anonymous");
+    setProjectRoles({});
+    setRolePermissions({});
   }, []);
 
+  const can = useCallback(
+    (permission: string, projectId: number | null | undefined): boolean => {
+      if (user?.admin) return true;
+      if (!projectId) return false;
+      const roleIds = projectRoles[projectId];
+      if (!roleIds) return false;
+      return roleIds.some((roleId) => rolePermissions[roleId]?.includes(permission));
+    },
+    [user, projectRoles, rolePermissions],
+  );
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, client, baseUrl, error, login, logout }),
-    [status, user, client, baseUrl, error, login, logout],
+    () => ({ status, user, client, baseUrl, error, login, logout, can, permissionsLoading }),
+    [status, user, client, baseUrl, error, login, logout, can, permissionsLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

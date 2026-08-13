@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LogTimeDialog, type LogTimeDialogInitial } from "@/components/time/LogTimeDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjects } from "@/hooks/useProjects";
@@ -101,6 +102,8 @@ export function TimeTrackingPage() {
   const { activities } = useTimeEntryActivities(client);
   const [scope, setScope] = useState<TimeEntryListFilters["scope"]>("me");
   const [range, setRange] = useState<RangeValue>("w");
+  const [deleteTarget, setDeleteTarget] = useState<TimeEntry | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filters: TimeEntryListFilters = {
     scope,
@@ -126,11 +129,16 @@ export function TimeTrackingPage() {
     reload();
   }
 
-  async function handleDelete(entry: TimeEntry) {
-    if (!client) return;
-    if (!window.confirm(`Удалить запись на ${entry.hours} ч за ${entry.spent_on}?`)) return;
-    await deleteTimeEntry(client, entry.id);
-    reload();
+  async function handleDelete() {
+    if (!client || !deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteTimeEntry(client, deleteTarget.id);
+      setDeleteTarget(null);
+      reload();
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   return (
@@ -260,7 +268,7 @@ export function TimeTrackingPage() {
                             variant="ghost"
                             size="icon-sm"
                             aria-label="Удалить запись"
-                            onClick={() => handleDelete(entry)}
+                            onClick={() => setDeleteTarget(entry)}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -282,6 +290,19 @@ export function TimeTrackingPage() {
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Удалить запись времени?"
+        description={
+          deleteTarget
+            ? `${deleteTarget.hours} ч за ${deleteTarget.spent_on} - действие необратимо.`
+            : undefined
+        }
+        onConfirm={handleDelete}
+        isConfirming={isDeleting}
+      />
     </div>
   );
 }

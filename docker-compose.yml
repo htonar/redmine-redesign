@@ -1,0 +1,79 @@
+# Полное локальное окружение для тестирования проекта:
+# - redmine        - чистый Redmine-инстанс (данные для проверки клиента)
+# - redmine-db      - его база (Postgres)
+# - proxy           - наш CORS-прокси (server/), см. CLAUDE.md
+# - frontend        - собранный SPA, отдается через nginx
+#
+# Запуск: docker compose up --build
+#
+# После первого старта Redmine (может занять минуту на первичную миграцию):
+#   1. http://localhost:3000, логин admin/admin, Redmine попросит сменить пароль.
+#   2. Включить REST API: Administration -> Settings -> API -> "Enable REST API".
+#   3. Получить API-ключ: My account -> API access key.
+#   4. Открыть http://localhost:8080, на экране логина указать
+#      "http://localhost:3000" и полученный API-ключ.
+#
+# proxy подключен через network_mode: service:redmine (общий сетевой namespace
+# с контейнером redmine), а не отдельной bridge-сетью. Так "http://localhost:3000"
+# - тот же адрес, что пользователь вводит на экране логина - у прокси изнутри
+# резолвится в сам Redmine, а не в другой контейнер: прокси намеренно разрешает
+# http только для localhost/127.0.0.1 (см. CLAUDE.md), и это единственный
+# способ уложиться в это ограничение без правки кода прокси и без host-сети
+# (которая на некоторых окружениях с Docker Desktop/виртуализированным демоном
+# не пробрасывается на реальный хост).
+
+services:
+  redmine-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: redmine
+      POSTGRES_USER: redmine
+      POSTGRES_PASSWORD: redmine
+    volumes:
+      - redmine-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redmine"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redmine:
+    image: redmine:6-alpine
+    depends_on:
+      redmine-db:
+        condition: service_healthy
+    environment:
+      REDMINE_DB_POSTGRES: redmine-db
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: redmine
+    ports:
+      - "3000:3000" # сам Redmine (админка, ручная настройка API-ключа)
+      - "8787:8787" # порт proxy - слушает в этом же network namespace, см. ниже
+    volumes:
+      - redmine-files:/usr/src/redmine/files
+
+  proxy:
+    build:
+      context: ./server
+    network_mode: service:redmine
+    depends_on:
+      - redmine
+    environment:
+      PORT: 8787
+      ALLOWED_ORIGIN: http://localhost:8080
+      ALLOWED_REDMINE_HOSTS: localhost
+
+  frontend:
+    build:
+      context: .
+      args:
+        VITE_REDMINE_PROXY_URL: http://localhost:8787
+    ports:
+      - "8080:80"
+    depends_on:
+      - proxy
+
+volumes:
+  redmine-db-data:
+  redmine-files:

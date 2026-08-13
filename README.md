@@ -60,3 +60,32 @@ npm install
 cp .env.example .env    # прописать ALLOWED_REDMINE_HOSTS
 npm run dev
 ```
+
+## Docker
+
+Каждая часть собирается в отдельный образ:
+
+- `Dockerfile` (корень) - фронтенд, multi-stage сборка (`vite build`) + nginx для
+  раздачи статики. Адрес прокси зашивается на этапе сборки через build arg
+  `VITE_REDMINE_PROXY_URL` (Vite инлайнит `import.meta.env.*` при билде).
+- `server/Dockerfile` - прокси-бэкенд, запускает исходники через `tsx` (как и
+  `npm run start` локально - отдельного шага компиляции в проекте нет).
+
+Полное окружение для тестирования (свой Redmine + прокси + фронт) - через
+`docker-compose.yml`:
+
+```sh
+docker compose up --build
+```
+
+Поднимает: `redmine` (localhost:3000) + `redmine-db` (Postgres) + `proxy`
+(localhost:8787) + `frontend` (localhost:8080). После первого старта Redmine:
+
+1. `http://localhost:3000`, логин `admin`/`admin`, Redmine попросит сменить пароль.
+2. Включить REST API: Administration -> Settings -> API -> "Enable REST API".
+3. Получить API-ключ: My account -> API access key.
+4. Открыть `http://localhost:8080`, на экране логина указать
+   `http://localhost:3000` и полученный API-ключ.
+
+Подробности по сетевой схеме (почему `proxy` подключен через
+`network_mode: service:redmine`) - в комментариях `docker-compose.yml`.
