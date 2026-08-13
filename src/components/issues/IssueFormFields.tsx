@@ -18,6 +18,21 @@ import type { ProjectVersion } from "@/hooks/useProjectVersions";
 const UNASSIGNED = "none";
 const DONE_RATIO_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
+/**
+ * Пользовательское поле в форме. `fieldFormat`/`possibleValues` приходят из
+ * GET /custom_fields.json (только для админов, см. api/customFields.ts) -
+ * без них поле рендерится обычным текстовым инпутом (честный fallback, не
+ * гадаем тип). См. CLAUDE.md, "Custom fields".
+ */
+export interface CustomFieldFormValue {
+  id: number;
+  name: string;
+  value: string | string[];
+  fieldFormat?: string;
+  possibleValues?: { value?: string; label?: string }[];
+  multiple?: boolean;
+}
+
 export interface IssueFormValues {
   subject: string;
   trackerId: number | null;
@@ -30,11 +45,143 @@ export interface IssueFormValues {
   doneRatio: number;
   estimatedHours: string;
   description: string;
+  customFields: CustomFieldFormValue[];
+}
+
+interface CustomFieldInputProps {
+  field: CustomFieldFormValue;
+  onChange: (value: string | string[]) => void;
+}
+
+/**
+ * Инпут под конкретное пользовательское поле - рендер по `fieldFormat`, если
+ * он известен (см. CustomFieldFormValue), иначе обычный текст. `multiple` -
+ * для MVP как текст через запятую, не отдельный multi-select компонент
+ * (см. CLAUDE.md, "Custom fields" - осознанное упрощение).
+ */
+function CustomFieldInput({ field, onChange }: CustomFieldInputProps) {
+  const fieldId = useId();
+
+  if (field.multiple) {
+    const joined = Array.isArray(field.value)
+      ? field.value.join(", ")
+      : field.value;
+    return (
+      <Input
+        id={fieldId}
+        value={joined}
+        onChange={(e) =>
+          onChange(
+            e.target.value
+              .split(",")
+              .map((v) => v.trim())
+              .filter(Boolean),
+          )
+        }
+        placeholder="Значения через запятую"
+      />
+    );
+  }
+
+  const value = Array.isArray(field.value)
+    ? (field.value[0] ?? "")
+    : field.value;
+
+  if (field.fieldFormat === "bool") {
+    return (
+      <Select value={value || "0"} onValueChange={onChange}>
+        <SelectTrigger id={fieldId} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="1">Да</SelectItem>
+          <SelectItem value="0">Нет</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  if (
+    (field.fieldFormat === "enumeration" || field.fieldFormat === "list") &&
+    field.possibleValues?.length
+  ) {
+    return (
+      <Select value={value || undefined} onValueChange={onChange}>
+        <SelectTrigger id={fieldId} className="w-full">
+          <SelectValue placeholder="Не выбрано" />
+        </SelectTrigger>
+        <SelectContent>
+          {field.possibleValues.map((pv) => (
+            <SelectItem key={pv.value} value={pv.value ?? ""}>
+              {pv.label ?? pv.value}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  if (field.fieldFormat === "date") {
+    return (
+      <Input
+        id={fieldId}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+
+  if (field.fieldFormat === "int") {
+    return (
+      <Input
+        id={fieldId}
+        type="number"
+        step={1}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+
+  if (field.fieldFormat === "float") {
+    return (
+      <Input
+        id={fieldId}
+        type="number"
+        step="any"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+
+  if (field.fieldFormat === "text") {
+    return (
+      <Textarea
+        id={fieldId}
+        rows={3}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+
+  return (
+    <Input
+      id={fieldId}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
 }
 
 export interface IssueFormFieldsProps {
   values: IssueFormValues;
-  onChange: <K extends keyof IssueFormValues>(field: K, value: IssueFormValues[K]) => void;
+  onChange: <K extends keyof IssueFormValues>(
+    field: K,
+    value: IssueFormValues[K],
+  ) => void;
   trackers: Tracker[];
   priorities: IssuePriority[];
   members: ProjectMember[];
@@ -93,7 +240,9 @@ export function IssueFormFields({
             Трекер
           </Label>
           <Select
-            value={values.trackerId !== null ? String(values.trackerId) : undefined}
+            value={
+              values.trackerId !== null ? String(values.trackerId) : undefined
+            }
             onValueChange={(v) => onChange("trackerId", Number(v))}
           >
             <SelectTrigger id={trackerId} className="w-full">
@@ -113,7 +262,9 @@ export function IssueFormFields({
             Приоритет
           </Label>
           <Select
-            value={values.priorityId !== null ? String(values.priorityId) : undefined}
+            value={
+              values.priorityId !== null ? String(values.priorityId) : undefined
+            }
             onValueChange={(v) => onChange("priorityId", Number(v))}
           >
             <SelectTrigger id={priorityId} className="w-full">
@@ -135,8 +286,14 @@ export function IssueFormFields({
           Исполнитель
         </Label>
         <Select
-          value={values.assignedToId !== null ? String(values.assignedToId) : UNASSIGNED}
-          onValueChange={(v) => onChange("assignedToId", v === UNASSIGNED ? null : Number(v))}
+          value={
+            values.assignedToId !== null
+              ? String(values.assignedToId)
+              : UNASSIGNED
+          }
+          onValueChange={(v) =>
+            onChange("assignedToId", v === UNASSIGNED ? null : Number(v))
+          }
         >
           <SelectTrigger id={assigneeId} className="w-full">
             <SelectValue placeholder="Не назначен" />
@@ -158,8 +315,14 @@ export function IssueFormFields({
             Категория
           </Label>
           <Select
-            value={values.categoryId !== null ? String(values.categoryId) : UNASSIGNED}
-            onValueChange={(v) => onChange("categoryId", v === UNASSIGNED ? null : Number(v))}
+            value={
+              values.categoryId !== null
+                ? String(values.categoryId)
+                : UNASSIGNED
+            }
+            onValueChange={(v) =>
+              onChange("categoryId", v === UNASSIGNED ? null : Number(v))
+            }
           >
             <SelectTrigger id={categoryFieldId} className="w-full">
               <SelectValue placeholder="Не выбрана" />
@@ -179,8 +342,14 @@ export function IssueFormFields({
             Версия
           </Label>
           <Select
-            value={values.fixedVersionId !== null ? String(values.fixedVersionId) : UNASSIGNED}
-            onValueChange={(v) => onChange("fixedVersionId", v === UNASSIGNED ? null : Number(v))}
+            value={
+              values.fixedVersionId !== null
+                ? String(values.fixedVersionId)
+                : UNASSIGNED
+            }
+            onValueChange={(v) =>
+              onChange("fixedVersionId", v === UNASSIGNED ? null : Number(v))
+            }
           >
             <SelectTrigger id={versionFieldId} className="w-full">
               <SelectValue placeholder="Не выбрана" />
@@ -271,6 +440,27 @@ export function IssueFormFields({
           placeholder="Необязательно"
         />
       </div>
+
+      {values.customFields.length > 0 && (
+        <div className="flex flex-col gap-3 border-t border-border pt-3">
+          <div className="text-xs font-medium text-muted-foreground">
+            Дополнительные поля
+          </div>
+          {values.customFields.map((field, i) => (
+            <div key={field.id}>
+              <Label className="mb-1.5">{field.name}</Label>
+              <CustomFieldInput
+                field={field}
+                onChange={(value) => {
+                  const next = values.customFields.slice();
+                  next[i] = { ...field, value };
+                  onChange("customFields", next);
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

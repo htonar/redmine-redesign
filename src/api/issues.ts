@@ -52,11 +52,17 @@ export async function listIssues(
     throw new Error("Не удалось загрузить список задач.");
   }
 
-  return { issues: data.issues, totalCount: data.total_count ?? data.issues.length };
+  return {
+    issues: data.issues,
+    totalCount: data.total_count ?? data.issues.length,
+  };
 }
 
 /** Карточка задачи - все поля + история изменений, подзадачи, связи и доступные для текущего пользователя переходы статуса. */
-export async function getIssue(client: RedmineClient, id: number): Promise<Issue> {
+export async function getIssue(
+  client: RedmineClient,
+  id: number,
+): Promise<Issue> {
   const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
     params: {
       path: { format: "json", issue_id: id },
@@ -85,7 +91,10 @@ export async function getIssue(client: RedmineClient, id: number): Promise<Issue
  * отображения ссылки на родителя/связанную задачу, когда есть только её id
  * (issue.parent и issue.relations отдают только { id }, без темы).
  */
-export async function getIssueSummary(client: RedmineClient, id: number): Promise<IssueSummary> {
+export async function getIssueSummary(
+  client: RedmineClient,
+  id: number,
+): Promise<IssueSummary> {
   const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
     params: { path: { format: "json", issue_id: id } },
   });
@@ -110,7 +119,10 @@ export async function getIssueJournal(
   id: number,
 ): Promise<{ issue: IssueSummary; journals: IssueJournal[] }> {
   const { data, error } = await client.GET("/issues/{issue_id}.{format}", {
-    params: { path: { format: "json", issue_id: id }, query: { include: ["journals"] } },
+    params: {
+      path: { format: "json", issue_id: id },
+      query: { include: ["journals"] },
+    },
   });
 
   if (error || !data) {
@@ -149,6 +161,11 @@ export interface IssueFieldsInput {
    * (deleteAttachment), не через этот массив.
    */
   uploads?: { token: string; filename: string; contentType?: string }[];
+  /**
+   * Пользовательские поля - {id, value}, value - строка или массив строк для
+   * полей с multiple. См. src/api/customFields.ts, CLAUDE.md ("Custom fields").
+   */
+  customFields?: { id: number; value: string | string[] | null }[];
 }
 
 export interface IssueCreateInput extends IssueFieldsInput {
@@ -184,6 +201,7 @@ export async function createIssue(
           filename: u.filename,
           content_type: u.contentType,
         })),
+        custom_fields: input.customFields,
       },
     },
   });
@@ -233,6 +251,7 @@ export async function updateIssue(
           filename: u.filename,
           content_type: u.contentType,
         })),
+        custom_fields: input.customFields,
       },
     },
   });
@@ -248,10 +267,16 @@ export async function updateIssue(
  * docs/permissions.md. Серверная проверка (403) остается финальным
  * решением - клиентская (AuthContext.can) только прячет кнопку заранее.
  */
-export async function deleteIssue(client: RedmineClient, id: number): Promise<void> {
-  const { error, response } = await client.DELETE("/issues/{issue_id}.{format}", {
-    params: { path: { format: "json", issue_id: id } },
-  });
+export async function deleteIssue(
+  client: RedmineClient,
+  id: number,
+): Promise<void> {
+  const { error, response } = await client.DELETE(
+    "/issues/{issue_id}.{format}",
+    {
+      params: { path: { format: "json", issue_id: id } },
+    },
+  );
 
   if (error) {
     if (response.status === 403) {
@@ -286,16 +311,19 @@ export async function createIssueRelation(
   issueId: number,
   input: IssueRelationInput,
 ): Promise<IssueRelation> {
-  const { data, error } = await client.POST("/issues/{issue_id}/relations.{format}", {
-    params: { path: { format: "json", issue_id: issueId } },
-    body: {
-      relation: {
-        issue_to_id: input.issueToId,
-        relation_type: input.relationType,
-        delay: input.delay ?? undefined,
+  const { data, error } = await client.POST(
+    "/issues/{issue_id}/relations.{format}",
+    {
+      params: { path: { format: "json", issue_id: issueId } },
+      body: {
+        relation: {
+          issue_to_id: input.issueToId,
+          relation_type: input.relationType,
+          delay: input.delay ?? undefined,
+        },
       },
     },
-  });
+  );
 
   if (error || !data) {
     throw new Error("Не удалось добавить связь - проверьте номер задачи.");
@@ -309,9 +337,12 @@ export async function deleteIssueRelation(
   client: RedmineClient,
   relationId: number,
 ): Promise<void> {
-  const { error } = await client.DELETE("/relations/{issue_relation_id}.{format}", {
-    params: { path: { format: "json", issue_relation_id: relationId } },
-  });
+  const { error } = await client.DELETE(
+    "/relations/{issue_relation_id}.{format}",
+    {
+      params: { path: { format: "json", issue_relation_id: relationId } },
+    },
+  );
 
   if (error) {
     throw new Error("Не удалось удалить связь.");

@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -47,6 +48,8 @@ import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectCategories } from "@/hooks/useProjectCategories";
 import { useProjectVersions } from "@/hooks/useProjectVersions";
+import { useCustomFieldDefinitions } from "@/hooks/useCustomFieldDefinitions";
+import type { CustomFieldDefinition } from "@/api/customFields";
 import {
   createIssueRelation,
   deleteIssue,
@@ -96,7 +99,16 @@ function Field({ label, children }: FieldProps) {
   );
 }
 
-function issueToFormValues(issue: Issue): IssueFormValues {
+/**
+ * `definitions` - справочник GET /custom_fields.json (только для админов,
+ * см. useCustomFieldDefinitions) - без него поля всё равно показываются и
+ * редактируются (значения уже есть на самом issue), просто обычным текстом
+ * вместо типового инпута (select для list/bool и т.п.), см. CLAUDE.md.
+ */
+function issueToFormValues(
+  issue: Issue,
+  definitions: CustomFieldDefinition[],
+): IssueFormValues {
   return {
     subject: issue.subject,
     trackerId: issue.tracker?.id ?? null,
@@ -110,6 +122,17 @@ function issueToFormValues(issue: Issue): IssueFormValues {
     estimatedHours:
       issue.estimated_hours != null ? String(issue.estimated_hours) : "",
     description: issue.description ?? "",
+    customFields: (issue.custom_fields ?? []).map((f) => {
+      const def = definitions.find((d) => d.id === f.id);
+      return {
+        id: f.id,
+        name: f.name,
+        value: f.value ?? (f.multiple ? [] : ""),
+        fieldFormat: def?.field_format,
+        possibleValues: def?.possible_values,
+        multiple: f.multiple,
+      };
+    }),
   };
 }
 
@@ -149,6 +172,15 @@ function diffFormValues(
   if (current.description !== initial.description) {
     patch.description = current.description || null;
   }
+  if (
+    JSON.stringify(current.customFields) !==
+    JSON.stringify(initial.customFields)
+  ) {
+    patch.customFields = current.customFields.map((f) => ({
+      id: f.id,
+      value: f.value,
+    }));
+  }
   return patch;
 }
 
@@ -175,6 +207,23 @@ export function IssueDetailPage() {
   const { members } = useProjectMembers(client, projectId, user);
   const { categories } = useProjectCategories(client, projectId);
   const { versions } = useProjectVersions(client, projectId);
+  const { definitions: customFieldDefinitions } =
+    useCustomFieldDefinitions(client);
+  // Для истории изменений (JournalEntry) - записи об изменении custom field
+  // приходят как {property: "cf", name: "<id>"}, без имени - см. JournalEntry.
+  // issue.custom_fields не требует прав администратора (в отличие от
+  // customFieldDefinitions) - основной источник; definitions лишь дополняют
+  // именами полей, которых на этой задаче сейчас нет (могли быть в старой
+  // записи истории, но позже сняты с трекера).
+  const customFieldNames = useMemo(() => {
+    const fromDefinitions = customFieldDefinitions.map(
+      (d): [number, string] => [d.id, d.name],
+    );
+    const fromIssue = (issue?.custom_fields ?? []).map(
+      (f): [number, string] => [f.id, f.name],
+    );
+    return Object.fromEntries([...fromDefinitions, ...fromIssue]);
+  }, [customFieldDefinitions, issue?.custom_fields]);
 
   // Родитель и "другая сторона" каждой связи отдают только { id } - подгружаем
   // темы отдельно, см. useIssueSummaries.
@@ -239,7 +288,7 @@ export function IssueDetailPage() {
 
   function handleStartEdit() {
     if (!issue) return;
-    const values = issueToFormValues(issue);
+    const values = issueToFormValues(issue, customFieldDefinitions);
     setEditValues(values);
     setEditInitialValues(values);
     setEditError(null);
@@ -814,6 +863,13 @@ export function IssueDetailPage() {
                       ? `${issue.spent_hours.toFixed(2)} ч`
                       : "—"}
                   </Field>
+                  {(issue.custom_fields ?? []).map((f) => (
+                    <Field key={f.id} label={f.name}>
+                      {Array.isArray(f.value)
+                        ? f.value.filter(Boolean).join(", ") || "—"
+                        : (f.value ?? "—")}
+                    </Field>
+                  ))}
                   <div className="col-span-2 sm:col-span-3 lg:col-span-4">
                     <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                       <span>Готовность</span>
@@ -1275,7 +1331,11 @@ export function IssueDetailPage() {
               <div className="flex flex-col">
                 {issue.journals && issue.journals.length > 0 ? (
                   issue.journals.map((j) => (
-                    <JournalEntry key={j.id} journal={j} />
+                    <JournalEntry
+                      key={j.id}
+                      journal={j}
+                      customFieldNames={customFieldNames}
+                    />
                   ))
                 ) : (
                   <p className="py-2 text-sm text-muted-foreground">
