@@ -43,7 +43,7 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Версия - только через ручной ввод при запуске (см. описание триггера
       # выше), не производная от git-тега/пуша. Поле "version" в
@@ -54,7 +54,7 @@ jobs:
       - name: Set version
         run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
