@@ -50,6 +50,7 @@ function defaultPriorityId(priorities: IssuePriority[]): number | null {
 export interface CreateIssueDialogProps {
   trigger: ReactNode;
   client: RedmineClient | null;
+  /** Проекты для селектора - вызывающий должен отфильтровать по праву add_issues (см. IssuesPage). */
   projects: Project[];
   /** Проект по умолчанию для новой задачи - например, текущий фильтр в Topbar. */
   defaultProjectId?: number | null;
@@ -92,7 +93,12 @@ export function CreateIssueDialog({
 
   function handleOpenChange(next: boolean) {
     if (next) {
-      setProjectId(defaultProjectId ?? projects[0]?.id ?? null);
+      // defaultProjectId годится, только если он есть в списке projects -
+      // тот уже отфильтрован по правам (add_issues) на стороне вызывающего
+      // (см. IssuesPage) - иначе откатываемся на первый доступный проект.
+      const defaultIsAllowed =
+        defaultProjectId != null && projects.some((p) => p.id === defaultProjectId);
+      setProjectId(defaultIsAllowed ? defaultProjectId! : (projects[0]?.id ?? null));
       setValues(EMPTY_VALUES);
       setFormError(null);
     }

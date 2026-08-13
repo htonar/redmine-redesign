@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LogTimeDialog } from "@/components/time/LogTimeDialog";
 import { IssueFormFields, type IssueFormValues } from "@/components/issues/IssueFormFields";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,7 +26,7 @@ import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectCategories } from "@/hooks/useProjectCategories";
 import { useProjectVersions } from "@/hooks/useProjectVersions";
-import { updateIssue, type Issue, type IssueUpdateInput } from "@/api/issues";
+import { deleteIssue, updateIssue, type Issue, type IssueUpdateInput } from "@/api/issues";
 import { createTimeEntry, type TimeEntryInput } from "@/api/timeEntries";
 
 /** Человекочитаемые подписи для самых частых полей в истории изменений (journal.details). */
@@ -155,7 +156,7 @@ function JournalEntry({ journal }: { journal: NonNullable<Issue["journals"]>[num
 export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { client } = useAuth();
+  const { client, can } = useAuth();
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
   const issueId = id ? Number(id) : null;
@@ -177,6 +178,8 @@ export function IssueDetailPage() {
   const [editInitialValues, setEditInitialValues] = useState<IssueFormValues | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   function handleStartEdit() {
     if (!issue) return;
@@ -229,6 +232,20 @@ export function IssueDetailPage() {
       setEditError(e instanceof Error ? e.message : "Не удалось сохранить изменения.");
     } finally {
       setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!client || !issue) return;
+    setIsDeleting(true);
+    setActionError(null);
+    try {
+      await deleteIssue(client, issue.id);
+      navigate("/issues");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Не удалось удалить задачу.");
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
     }
   }
 
@@ -305,10 +322,26 @@ export function IssueDetailPage() {
               <h1 className="text-xl font-semibold tracking-tight">{issue.subject}</h1>
             </div>
             <div className="flex items-center gap-2">
-              {!isEditing && (
+              {!isEditing && can("edit_issues", projectId) && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={handleStartEdit}>
                   <Pencil className="size-3.5" />
                   Редактировать
+                </Button>
+              )}
+              {can("delete_issues", projectId) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
+                  Удалить
                 </Button>
               )}
               {issue.priority?.name && <Badge variant="outline">{issue.priority.name}</Badge>}
@@ -338,6 +371,15 @@ export function IssueDetailPage() {
               )}
             </div>
           </div>
+
+          <ConfirmDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={setIsDeleteDialogOpen}
+            title={`Удалить задачу #${issue.id}?`}
+            description={`«${issue.subject}» будет удалена без возможности восстановления.`}
+            onConfirm={handleDelete}
+            isConfirming={isDeleting}
+          />
 
           {isEditing && editValues ? (
             <Card>

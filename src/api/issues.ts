@@ -170,3 +170,22 @@ export async function updateIssue(
     throw new Error("Не удалось обновить задачу.");
   }
 }
+
+/**
+ * Удаление задачи. Требует право `delete_issues` на проекте задачи - у этого
+ * права нет варианта "только свои" (в отличие от заметок), см.
+ * docs/permissions.md. Серверная проверка (403) остается финальным
+ * решением - клиентская (AuthContext.can) только прячет кнопку заранее.
+ */
+export async function deleteIssue(client: RedmineClient, id: number): Promise<void> {
+  const { error, response } = await client.DELETE("/issues/{issue_id}.{format}", {
+    params: { path: { format: "json", issue_id: id } },
+  });
+
+  if (error) {
+    if (response.status === 403) {
+      throw new Error("Недостаточно прав для удаления этой задачи.");
+    }
+    throw new Error("Не удалось удалить задачу.");
+  }
+}

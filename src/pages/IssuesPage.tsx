@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { ArrowDown, ArrowUp, Bookmark, ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +65,7 @@ function formatDate(iso: string): string {
  */
 export function IssuesPage() {
   const navigate = useNavigate();
-  const { client, baseUrl, user } = useAuth();
+  const { client, baseUrl, user, can } = useAuth();
   const { selectedProjectId, setSelectedProjectId } = useLayoutContext();
   const [assignee, setAssignee] = useState<IssueListFilters["assignee"]>(
     DEFAULT_FILTERS.assignee,
@@ -102,21 +102,36 @@ export function IssuesPage() {
     setSelectedProjectId(view.filters.projectId ?? null);
   }
 
+  // Проекты, где у пользователя есть add_issues - и для решения "показывать ли
+  // кнопку вообще", и как список для селектора внутри диалога (см.
+  // docs/permissions.md). Если в Topbar выбран конкретный проект без прав -
+  // кнопку скрываем совсем, не подсовывая создание в другом проекте вместо
+  // выбранного.
+  const creatableProjects = useMemo(
+    () => projects.filter((p) => can("add_issues", p.id)),
+    [projects, can],
+  );
+  const canCreateIssue =
+    creatableProjects.length > 0 &&
+    (selectedProjectId === null || can("add_issues", selectedProjectId));
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <CreateIssueDialog
-          client={client}
-          projects={projects}
-          defaultProjectId={selectedProjectId}
-          onCreated={(issue) => navigate(`/issues/${issue.id}`)}
-          trigger={
-            <Button size="sm" className="gap-1.5">
-              <Plus className="size-3.5" />
-              Добавить задачу
-            </Button>
-          }
-        />
+        {canCreateIssue && (
+          <CreateIssueDialog
+            client={client}
+            projects={creatableProjects}
+            defaultProjectId={selectedProjectId}
+            onCreated={(issue) => navigate(`/issues/${issue.id}`)}
+            trigger={
+              <Button size="sm" className="gap-1.5">
+                <Plus className="size-3.5" />
+                Добавить задачу
+              </Button>
+            }
+          />
+        )}
 
         <Select value={assignee} onValueChange={(v) => setAssignee(v as typeof assignee)}>
           <SelectTrigger className="w-40">
