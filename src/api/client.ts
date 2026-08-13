@@ -1,5 +1,7 @@
 import createClient, { type Middleware } from "openapi-fetch";
+import { isTauri } from "@tauri-apps/api/core";
 import type { paths } from "./schema";
+import { tauriFetch } from "./tauriFetch";
 
 export interface RedmineAuth {
   /** Redmine API key (sent as X-Redmine-API-Key header). Preferred over login/password. */
@@ -30,7 +32,14 @@ export interface RedmineClientOptions {
  * `npm run api:generate` - see api/redmine-openapi.yaml.
  */
 export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOptions) {
-  const fetchBaseUrl = proxyUrl ? `${proxyUrl.replace(/\/+$/, "")}/proxy` : baseUrl;
+  // Десктоп-сборка (Tauri) - см. src/api/tauriFetch.ts и
+  // src-tauri/src/proxy.rs. Там CORS в принципе не встает (запрос идет не из
+  // webview напрямую, а форвардится Rust-командой через reqwest), поэтому
+  // отдельный прокси-сервер (proxyUrl) не нужен и не используется, даже если
+  // почему-то задан - запросы идут прямо на baseUrl, как будто прокси нет.
+  const tauri = isTauri();
+  const fetchBaseUrl =
+    !tauri && proxyUrl ? `${proxyUrl.replace(/\/+$/, "")}/proxy` : baseUrl;
   const client = createClient<paths>({
     baseUrl: fetchBaseUrl,
     // openapi-fetch по умолчанию сериализует массивы в query как повторяющиеся
@@ -40,6 +49,7 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
     // allowed_statuses,children,relations в getIssue (src/api/issues.ts) -
     // Redmine получал только "relations", остальные include молча терялись.
     querySerializer: { array: { style: "form", explode: false } },
+    ...(tauri ? { fetch: tauriFetch } : {}),
   });
 
   function authHeaders(): Record<string, string> {
@@ -49,7 +59,10 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
     } else if (auth?.login && auth?.password) {
       headers["Authorization"] = `Basic ${btoa(`${auth.login}:${auth.password}`)}`;
     }
-    if (proxyUrl) {
+    // X-Redmine-Target нужен только Node-прокси, чтобы понять, куда
+    // форвардить (сам он слушает на своем origin) - в Tauri-режиме fetch идет
+    // прямо на baseUrl, отдельный заголовок с адресом цели не нужен.
+    if (!tauri && proxyUrl) {
       headers["X-Redmine-Target"] = baseUrl;
     }
     return headers;
@@ -85,7 +98,8 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
     for (const [name, value] of Object.entries(authHeaders())) {
       headers.set(name, value);
     }
-    return fetch(`${fetchBaseUrl}${path}`, { ...init, headers });
+    const request = new Request(`${fetchBaseUrl}${path}`, { ...init, headers });
+    return tauri ? tauriFetch(request) : fetch(request);
   }
 
   return Object.assign(client, { rawFetch });
