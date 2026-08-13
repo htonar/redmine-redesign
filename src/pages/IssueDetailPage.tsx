@@ -822,7 +822,14 @@ export function IssueDetailPage() {
                 </Button>
               )}
               {issue.priority?.name && (
-                <Badge variant="outline">{issue.priority.name}</Badge>
+                // h-8 px-3 - у Badge своя высота (h-5), заметно меньше
+                // соседних кнопок/селекта (h-8) в этом ряду - на аудите
+                // верстки бросалось в глаза как случайно уменьшенный
+                // элемент. Выравниваем высоту, оставляя стиль "плашки"
+                // (не кнопки - у неё нет действия по клику).
+                <Badge variant="outline" className="h-8 px-3 text-sm">
+                  {issue.priority.name}
+                </Badge>
               )}
               {issue.allowed_statuses && issue.allowed_statuses.length > 0 ? (
                 <Select

@@ -14,7 +14,12 @@ function Progress({
     <ProgressPrimitive.Root
       data-slot="progress"
       className={cn(
-        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
+        // bg-muted почти сливался с фоном карточки (оба - близкие темные
+        // оттенки в палитре, см. docs/design.md) - пустая дорожка на 0%
+        // была практически невидима (найдено на аудите верстки). foreground/10
+        // - тот же прием, что и у собственной рамки Card (ring-foreground/10),
+        // гарантированно виден поверх любого фона в обеих темах.
+        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-foreground/10",
         className,
       )}
       {...props}

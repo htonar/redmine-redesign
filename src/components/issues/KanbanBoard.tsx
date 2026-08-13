@@ -77,7 +77,10 @@ function KanbanCard({ issue, draggable, onOpen }: KanbanCardProps) {
         className="min-w-0 flex-1 text-left"
         onClick={onOpen}
       >
-        <div className="text-xs text-muted-foreground">#{issue.id}</div>
+        <div className="text-xs text-muted-foreground">
+          #{issue.id}
+          {issue.tracker?.name && ` · ${issue.tracker.name}`}
+        </div>
         <div className="line-clamp-2 font-medium">{issue.subject}</div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {issue.priority?.name && (
