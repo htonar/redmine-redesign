@@ -1,6 +1,16 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { ArrowDown, ArrowUp, Bookmark, ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bookmark,
+  ChevronDown,
+  Kanban,
+  List,
+  Loader2,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +38,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SaveViewDialog } from "@/components/issues/SaveViewDialog";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
+import { KanbanBoard } from "@/components/issues/KanbanBoard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssues } from "@/hooks/useIssues";
 import { useIssueViews } from "@/hooks/useIssueViews";
@@ -36,11 +47,12 @@ import type { IssueListFilters } from "@/api/issues";
 import type { IssueView } from "@/lib/issue-views-storage";
 import { useLayoutContext } from "./AppLayout";
 
-const DEFAULT_FILTERS: Pick<IssueListFilters, "assignee" | "status" | "sort"> = {
-  assignee: "me",
-  status: "open",
-  sort: "updated_on:desc",
-};
+const DEFAULT_FILTERS: Pick<IssueListFilters, "assignee" | "status" | "sort"> =
+  {
+    assignee: "me",
+    status: "open",
+    sort: "updated_on:desc",
+  };
 
 const SORTABLE_COLUMNS: { field: string; label: string }[] = [
   { field: "id", label: "ID" },
@@ -70,8 +82,12 @@ export function IssuesPage() {
   const [assignee, setAssignee] = useState<IssueListFilters["assignee"]>(
     DEFAULT_FILTERS.assignee,
   );
-  const [status, setStatus] = useState<IssueListFilters["status"]>(DEFAULT_FILTERS.status);
+  const [status, setStatus] = useState<IssueListFilters["status"]>(
+    DEFAULT_FILTERS.status,
+  );
   const [sort, setSort] = useState(DEFAULT_FILTERS.sort);
+  // Не "view" - это имя уже занято переменной цикла для сохраненных видов (IssueView) ниже.
+  const [layout, setLayout] = useState<"table" | "kanban">("table");
 
   const filters: IssueListFilters = {
     projectId: selectedProjectId ?? undefined,
@@ -80,8 +96,15 @@ export function IssuesPage() {
     sort,
   };
 
-  const { issues, totalCount, isLoading, isLoadingMore, error, hasMore, loadMore } =
-    useIssues(client, filters);
+  const {
+    issues,
+    totalCount,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    loadMore,
+  } = useIssues(client, filters);
   const { views, save, remove } = useIssueViews(baseUrl, user?.id);
   const { projects } = useProjects(client);
 
@@ -134,7 +157,10 @@ export function IssuesPage() {
           />
         )}
 
-        <Select value={assignee} onValueChange={(v) => setAssignee(v as typeof assignee)}>
+        <Select
+          value={assignee}
+          onValueChange={(v) => setAssignee(v as typeof assignee)}
+        >
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
@@ -144,16 +170,42 @@ export function IssuesPage() {
           </SelectContent>
         </Select>
 
-        <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="open">Открытые</SelectItem>
-            <SelectItem value="closed">Закрытые</SelectItem>
-            <SelectItem value="all">Все статусы</SelectItem>
-          </SelectContent>
-        </Select>
+        {layout === "table" && (
+          <Select
+            value={status}
+            onValueChange={(v) => setStatus(v as typeof status)}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="open">Открытые</SelectItem>
+              <SelectItem value="closed">Закрытые</SelectItem>
+              <SelectItem value="all">Все статусы</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        <div className="flex items-center rounded-lg border border-border p-0.5">
+          <Button
+            size="icon-sm"
+            variant={layout === "table" ? "secondary" : "ghost"}
+            aria-label="Таблица"
+            aria-pressed={layout === "table"}
+            onClick={() => setLayout("table")}
+          >
+            <List className="size-3.5" />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant={layout === "kanban" ? "secondary" : "ghost"}
+            aria-label="Канбан-доска"
+            aria-pressed={layout === "kanban"}
+            onClick={() => setLayout("kanban")}
+          >
+            <Kanban className="size-3.5" />
+          </Button>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -202,90 +254,123 @@ export function IssuesPage() {
         </DropdownMenu>
       </div>
 
-      {error && (
+      {layout === "table" && error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {SORTABLE_COLUMNS.map(({ field, label }) => (
-                <TableHead key={field}>
-                  <button
-                    type="button"
-                    onClick={() => toggleSort(field)}
-                    className="flex items-center gap-1 hover:text-foreground"
-                  >
-                    {label}
-                    {sortField === field &&
-                      (sortDir === "desc" ? (
-                        <ArrowDown className="size-3.5" />
-                      ) : (
-                        <ArrowUp className="size-3.5" />
-                      ))}
-                  </button>
-                </TableHead>
-              ))}
-              <TableHead>Проект</TableHead>
-              <TableHead>Исполнитель</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={7} className="h-10 animate-pulse bg-muted/50" />
-                </TableRow>
-              ))}
+      {layout === "kanban" &&
+        (selectedProjectId === null ? (
+          <div className="rounded-lg border border-border bg-card py-8 text-center text-muted-foreground">
+            Канбан показывает статусы одного проекта - выберите проект в шапке.
+          </div>
+        ) : (
+          <KanbanBoard
+            client={client}
+            projectId={selectedProjectId}
+            assignee={assignee}
+            canEdit={can("edit_issues", selectedProjectId)}
+          />
+        ))}
 
-            {!isLoading && issues.length === 0 && !error && (
+      {layout === "table" && (
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                  Задач по этим фильтрам не найдено
-                </TableCell>
+                {SORTABLE_COLUMNS.map(({ field, label }) => (
+                  <TableHead key={field}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(field)}
+                      className="flex items-center gap-1 hover:text-foreground"
+                    >
+                      {label}
+                      {sortField === field &&
+                        (sortDir === "desc" ? (
+                          <ArrowDown className="size-3.5" />
+                        ) : (
+                          <ArrowUp className="size-3.5" />
+                        ))}
+                    </button>
+                  </TableHead>
+                ))}
+                <TableHead>Проект</TableHead>
+                <TableHead>Исполнитель</TableHead>
               </TableRow>
-            )}
+            </TableHeader>
+            <TableBody>
+              {isLoading &&
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell
+                      colSpan={7}
+                      className="h-10 animate-pulse bg-muted/50"
+                    />
+                  </TableRow>
+                ))}
 
-            {!isLoading &&
-              issues.map((issue) => (
-                <TableRow
-                  key={issue.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/issues/${issue.id}`)}
-                >
-                  <TableCell className="text-muted-foreground">#{issue.id}</TableCell>
-                  <TableCell className="max-w-xs truncate font-medium">
-                    {issue.subject}
+              {!isLoading && issues.length === 0 && !error && (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="py-8 text-center text-muted-foreground"
+                  >
+                    Задач по этим фильтрам не найдено
                   </TableCell>
-                  <TableCell>{issue.priority?.name ?? "-"}</TableCell>
-                  <TableCell>
-                    {issue.status && (
-                      <Badge variant={issue.status.is_closed ? "secondary" : "default"}>
-                        {issue.status.name}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(issue.updated_on)}
-                  </TableCell>
-                  <TableCell>{issue.project?.name ?? "-"}</TableCell>
-                  <TableCell>{issue.assigned_to?.name ?? "-"}</TableCell>
                 </TableRow>
-              ))}
-          </TableBody>
-        </Table>
-      </div>
+              )}
 
-      {!isLoading && issues.length > 0 && (
+              {!isLoading &&
+                issues.map((issue) => (
+                  <TableRow
+                    key={issue.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/issues/${issue.id}`)}
+                  >
+                    <TableCell className="text-muted-foreground">
+                      #{issue.id}
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate font-medium">
+                      {issue.subject}
+                    </TableCell>
+                    <TableCell>{issue.priority?.name ?? "-"}</TableCell>
+                    <TableCell>
+                      {issue.status && (
+                        <Badge
+                          variant={
+                            issue.status.is_closed ? "secondary" : "default"
+                          }
+                        >
+                          {issue.status.name}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(issue.updated_on)}
+                    </TableCell>
+                    <TableCell>{issue.project?.name ?? "-"}</TableCell>
+                    <TableCell>{issue.assigned_to?.name ?? "-"}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {layout === "table" && !isLoading && issues.length > 0 && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
             Показано {issues.length} из {totalCount}
           </span>
           {hasMore && (
-            <Button variant="outline" size="sm" onClick={loadMore} disabled={isLoadingMore}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadMore}
+              disabled={isLoadingMore}
+            >
               {isLoadingMore && <Loader2 className="size-3.5 animate-spin" />}
               Показать еще
             </Button>
