@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useIssueSearch } from "@/hooks/useIssueSearch";
 import { getIssueSummary } from "@/api/issues";
 import type { RedmineClient } from "@/api/client";
+import { cn } from "@/lib/utils";
 
 export interface IssuePickerProps {
   id?: string;
@@ -20,6 +21,8 @@ export interface IssuePickerProps {
   onChange: (id: number | null) => void;
   /** Сузить поиск до одного проекта - например, уже выбранного в форме. */
   projectId?: number | null;
+  /** Ширина и т.п. - по умолчанию растягивается на всю доступную ширину (см. LogTimeDialog); в инлайн-строке (IssueDetailPage) обычно нужно задать фиксированную. */
+  className?: string;
 }
 
 /**
@@ -28,8 +31,20 @@ export interface IssuePickerProps {
  * useIssueSearch. Выбранная задача показывается чипом "#id Тема" с крестиком
  * для сброса, а не остается текстовым полем с номером - номер сам по себе
  * ничего не говорит о том, та ли это задача.
+ *
+ * Общий компонент - используется в `LogTimeDialog` (поле "Задача") и в
+ * `IssueDetailPage` (родительская задача, подзадача, связанная задача) - см.
+ * CLAUDE.md, "Поиск задач с подсказками". Изначально жил в
+ * `components/time/`, вынесен сюда при обобщении на карточку задачи.
  */
-export function IssuePicker({ id, client, value, onChange, projectId }: IssuePickerProps) {
+export function IssuePicker({
+  id,
+  client,
+  value,
+  onChange,
+  projectId,
+  className,
+}: IssuePickerProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
@@ -77,7 +92,12 @@ export function IssuePicker({ id, client, value, onChange, projectId }: IssuePic
 
   if (value !== null) {
     return (
-      <div className="flex h-8 items-center gap-1.5 rounded-lg border border-input bg-transparent px-2.5 text-sm">
+      <div
+        className={cn(
+          "flex h-8 items-center gap-1.5 rounded-lg border border-input bg-transparent px-2.5 text-sm",
+          className,
+        )}
+      >
         <span className="text-muted-foreground">#{value}</span>
         <span className="truncate">
           {isResolvingSelected ? (
@@ -103,7 +123,13 @@ export function IssuePicker({ id, client, value, onChange, projectId }: IssuePic
   const showList = isOpen && query.trim().length > 0;
 
   return (
-    <Command shouldFilter={false} className="relative h-auto overflow-visible bg-transparent p-0">
+    <Command
+      shouldFilter={false}
+      className={cn(
+        "relative h-auto overflow-visible bg-transparent p-0",
+        className,
+      )}
+    >
       <CommandInput
         id={id}
         placeholder="Номер или тема задачи"
@@ -133,7 +159,9 @@ export function IssuePicker({ id, client, value, onChange, projectId }: IssuePic
                   onSelect={() => handleSelect(r.id, r.subject)}
                   className="flex items-center gap-1.5"
                 >
-                  <span className="shrink-0 text-muted-foreground">#{r.id}</span>
+                  <span className="shrink-0 text-muted-foreground">
+                    #{r.id}
+                  </span>
                   <span className="truncate">{r.subject}</span>
                 </CommandItem>
               ))}

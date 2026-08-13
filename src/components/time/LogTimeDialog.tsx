@@ -20,7 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { IssuePicker } from "@/components/time/IssuePicker";
+import { IssuePicker } from "@/components/issues/IssuePicker";
 import type { RedmineClient } from "@/api/client";
 import type { Project } from "@/hooks/useProjects";
 import type { TimeEntryActivity } from "@/hooks/useTimeEntryActivities";
@@ -138,7 +138,9 @@ export function LogTimeDialog({
       });
       setOpen(false);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Не удалось сохранить запись.");
+      setFormError(
+        err instanceof Error ? err.message : "Не удалось сохранить запись.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -150,10 +152,12 @@ export function LogTimeDialog({
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Изменить запись" : "Залогировать время"}</DialogTitle>
+            <DialogTitle>
+              {isEditing ? "Изменить запись" : "Залогировать время"}
+            </DialogTitle>
             <DialogDescription>
-              Укажите задачу (или проект, если задачи под рукой нет), сколько потрачено
-              времени и на что.
+              Укажите задачу (или проект, если задачи под рукой нет), сколько
+              потрачено времени и на что.
             </DialogDescription>
           </DialogHeader>
 

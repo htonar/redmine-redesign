@@ -21,7 +21,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -68,6 +67,7 @@ import {
 } from "@/api/attachments";
 import { addWatcher, removeWatcher } from "@/api/watchers";
 import { JournalEntry } from "@/components/issues/JournalEntry";
+import { IssuePicker } from "@/components/issues/IssuePicker";
 import {
   RELATION_TYPE_INVERSE,
   RELATION_TYPE_LABELS,
@@ -97,6 +97,28 @@ function Field({ label, children }: FieldProps) {
       <div className="text-sm">{children}</div>
     </div>
   );
+}
+
+/**
+ * Read-only отображение значения пользовательского поля на карточке
+ * (вне режима правки, где типовой инпут и так показывает понятное значение
+ * через CustomFieldInput). Без `definitions` (не-админ) - значение как есть
+ * от Redmine ("1"/"0" для bool и т.п.) - честный fallback, не гадаем тип.
+ */
+function formatCustomFieldValue(
+  field: NonNullable<Issue["custom_fields"]>[number],
+  definitions: CustomFieldDefinition[],
+): string {
+  const def = definitions.find((d) => d.id === field.id);
+  const values = Array.isArray(field.value) ? field.value : [field.value];
+  const formatted = values
+    .filter((v): v is string => Boolean(v))
+    .map((v) => {
+      if (def?.field_format === "bool") return v === "1" ? "Да" : "Нет";
+      const possible = def?.possible_values?.find((pv) => pv.value === v);
+      return possible?.label ?? v;
+    });
+  return formatted.join(", ") || "—";
 }
 
 /**
@@ -250,16 +272,17 @@ export function IssueDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const [parentInput, setParentInput] = useState("");
+  const [parentInput, setParentInput] = useState<number | null>(null);
   const [isEditingParent, setIsEditingParent] = useState(false);
   const [isSavingParent, setIsSavingParent] = useState(false);
   const [parentError, setParentError] = useState<string | null>(null);
 
-  const [childInput, setChildInput] = useState("");
+  const [childInput, setChildInput] = useState<number | null>(null);
   const [isAddingChild, setIsAddingChild] = useState(false);
   const [childError, setChildError] = useState<string | null>(null);
+  const [removingChildId, setRemovingChildId] = useState<number | null>(null);
 
-  const [relationInput, setRelationInput] = useState("");
+  const [relationInput, setRelationInput] = useState<number | null>(null);
   const [relationType, setRelationType] =
     useState<IssueRelationType>("relates");
   const [isAddingRelation, setIsAddingRelation] = useState(false);
@@ -340,21 +363,20 @@ export function IssueDetailPage() {
 
   async function handleSetParent() {
     if (!client || !issue) return;
-    const parentId = Number(parentInput.trim());
-    if (!parentInput.trim() || !Number.isFinite(parentId)) {
+    if (parentInput === null) {
       setParentError("Укажите номер задачи.");
       return;
     }
-    if (parentId === issue.id) {
+    if (parentInput === issue.id) {
       setParentError("Задача не может быть родителем сама себе.");
       return;
     }
     setParentError(null);
     setIsSavingParent(true);
     try {
-      await updateIssue(client, issue.id, { parentId });
+      await updateIssue(client, issue.id, { parentId: parentInput });
       setIsEditingParent(false);
-      setParentInput("");
+      setParentInput(null);
       reload();
     } catch (e) {
       setParentError(
@@ -387,20 +409,19 @@ export function IssueDetailPage() {
 
   async function handleAddChild() {
     if (!client || !issue) return;
-    const childId = Number(childInput.trim());
-    if (!childInput.trim() || !Number.isFinite(childId)) {
+    if (childInput === null) {
       setChildError("Укажите номер задачи.");
       return;
     }
-    if (childId === issue.id) {
+    if (childInput === issue.id) {
       setChildError("Задача не может быть подзадачей сама себе.");
       return;
     }
     setChildError(null);
     setIsAddingChild(true);
     try {
-      await updateIssue(client, childId, { parentId: issue.id });
-      setChildInput("");
+      await updateIssue(client, childInput, { parentId: issue.id });
+      setChildInput(null);
       reload();
     } catch (e) {
       setChildError(
@@ -411,22 +432,41 @@ export function IssueDetailPage() {
     }
   }
 
+  /** Отвязать подзадачу - технически это снятие родителя у самой подзадачи (parentId: null), отдельного эндпоинта "убрать подзадачу" в Redmine нет. */
+  async function handleRemoveChild(childId: number) {
+    if (!client) return;
+    setChildError(null);
+    setRemovingChildId(childId);
+    try {
+      await updateIssue(client, childId, { parentId: null });
+      reload();
+    } catch (e) {
+      setChildError(
+        e instanceof Error ? e.message : "Не удалось отвязать подзадачу.",
+      );
+    } finally {
+      setRemovingChildId(null);
+    }
+  }
+
   async function handleAddRelation() {
     if (!client || !issue) return;
-    const issueToId = Number(relationInput.trim());
-    if (!relationInput.trim() || !Number.isFinite(issueToId)) {
+    if (relationInput === null) {
       setRelationError("Укажите номер задачи.");
       return;
     }
-    if (issueToId === issue.id) {
+    if (relationInput === issue.id) {
       setRelationError("Задача не может быть связана сама с собой.");
       return;
     }
     setRelationError(null);
     setIsAddingRelation(true);
     try {
-      await createIssueRelation(client, issue.id, { issueToId, relationType });
-      setRelationInput("");
+      await createIssueRelation(client, issue.id, {
+        issueToId: relationInput,
+        relationType,
+      });
+      setRelationInput(null);
       reload();
     } catch (e) {
       setRelationError(
@@ -865,9 +905,7 @@ export function IssueDetailPage() {
                   </Field>
                   {(issue.custom_fields ?? []).map((f) => (
                     <Field key={f.id} label={f.name}>
-                      {Array.isArray(f.value)
-                        ? f.value.filter(Boolean).join(", ") || "—"
-                        : (f.value ?? "—")}
+                      {formatCustomFieldValue(f, customFieldDefinitions)}
                     </Field>
                   ))}
                   <div className="col-span-2 sm:col-span-3 lg:col-span-4">
@@ -926,11 +964,12 @@ export function IssueDetailPage() {
                   </div>
                 ) : isEditingParent ? (
                   <div className="flex items-center gap-2">
-                    <Input
-                      className="w-28"
-                      placeholder="№ задачи"
+                    <IssuePicker
+                      client={client}
                       value={parentInput}
-                      onChange={(e) => setParentInput(e.target.value)}
+                      onChange={setParentInput}
+                      projectId={projectId}
+                      className="w-56"
                     />
                     <Button
                       size="sm"
@@ -947,7 +986,7 @@ export function IssueDetailPage() {
                       variant="ghost"
                       onClick={() => {
                         setIsEditingParent(false);
-                        setParentInput("");
+                        setParentInput(null);
                         setParentError(null);
                       }}
                       disabled={isSavingParent}
@@ -976,15 +1015,34 @@ export function IssueDetailPage() {
                   Подзадачи
                 </div>
                 {issue.children && issue.children.length > 0 ? (
-                  <ul className="flex flex-col gap-1">
+                  <ul className="flex flex-col gap-1.5">
                     {issue.children.map((c, i) => (
-                      <li key={c.id ?? i}>
+                      <li
+                        key={c.id ?? i}
+                        className="flex items-center justify-between gap-2"
+                      >
                         <Link
                           to={`/issues/${c.id}`}
                           className="text-sm hover:underline"
                         >
                           #{c.id} — {c.subject ?? "—"}
                         </Link>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            c.id != null && handleRemoveChild(c.id)
+                          }
+                          disabled={c.id == null || removingChildId === c.id}
+                          aria-label="Отвязать подзадачу"
+                        >
+                          {removingChildId === c.id ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <X className="size-3.5" />
+                          )}
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -992,11 +1050,12 @@ export function IssueDetailPage() {
                   <p className="text-sm text-muted-foreground">Нет</p>
                 )}
                 <div className="mt-2 flex items-center gap-2">
-                  <Input
-                    className="w-28"
-                    placeholder="№ задачи"
+                  <IssuePicker
+                    client={client}
                     value={childInput}
-                    onChange={(e) => setChildInput(e.target.value)}
+                    onChange={setChildInput}
+                    projectId={projectId}
+                    className="w-56"
                   />
                   <Button
                     size="sm"
@@ -1095,11 +1154,12 @@ export function IssueDetailPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input
-                    className="w-28"
-                    placeholder="№ задачи"
+                  <IssuePicker
+                    client={client}
                     value={relationInput}
-                    onChange={(e) => setRelationInput(e.target.value)}
+                    onChange={setRelationInput}
+                    projectId={projectId}
+                    className="w-56"
                   />
                   <Button
                     size="sm"

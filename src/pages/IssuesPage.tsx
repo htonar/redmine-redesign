@@ -57,6 +57,7 @@ const DEFAULT_FILTERS: Pick<IssueListFilters, "assignee" | "status" | "sort"> =
 const SORTABLE_COLUMNS: { field: string; label: string }[] = [
   { field: "id", label: "ID" },
   { field: "subject", label: "Тема" },
+  { field: "tracker", label: "Трекер" },
   { field: "priority", label: "Приоритет" },
   { field: "status", label: "Статус" },
   { field: "updated_on", label: "Обновлено" },
@@ -306,7 +307,7 @@ export function IssuesPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="h-10 animate-pulse bg-muted/50"
                     />
                   </TableRow>
@@ -335,6 +336,9 @@ export function IssuesPage() {
                     </TableCell>
                     <TableCell className="max-w-xs truncate font-medium">
                       {issue.subject}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {issue.tracker?.name ?? "-"}
                     </TableCell>
                     <TableCell>{issue.priority?.name ?? "-"}</TableCell>
                     <TableCell>
