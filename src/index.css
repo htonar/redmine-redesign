@@ -195,5 +195,31 @@
   }
   html {
     @apply font-sans;
+    /* Firefox - тонкий скроллбар в тон темы вместо нативного серого/белого
+       ОС. scrollbar-color наследуется, действует на все прокручиваемые
+       контейнеры (диалоги, канбан-доску и т.п.), не только на body. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* Chromium/Safari - тот же тонкий скроллбар в тон темы (Firefox уже
+     покрыт scrollbar-width/scrollbar-color на html выше). Селектор
+     универсальный - ::-webkit-scrollbar не наследуется, нужен на каждом
+     прокручиваемом контейнере. */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
   }
 }
