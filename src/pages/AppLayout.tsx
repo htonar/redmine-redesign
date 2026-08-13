@@ -27,6 +27,7 @@ export function AppLayout() {
   return (
     <TooltipProvider delayDuration={200}>
       <AppShell
+        client={client}
         projects={projects}
         projectsLoading={projectsLoading}
         selectedProjectId={selectedProjectId}

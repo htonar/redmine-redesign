@@ -42,15 +42,23 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
     querySerializer: { array: { style: "form", explode: false } },
   });
 
+  function authHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (auth?.apiKey) {
+      headers["X-Redmine-API-Key"] = auth.apiKey;
+    } else if (auth?.login && auth?.password) {
+      headers["Authorization"] = `Basic ${btoa(`${auth.login}:${auth.password}`)}`;
+    }
+    if (proxyUrl) {
+      headers["X-Redmine-Target"] = baseUrl;
+    }
+    return headers;
+  }
+
   const authMiddleware: Middleware = {
     onRequest({ request }) {
-      if (auth?.apiKey) {
-        request.headers.set("X-Redmine-API-Key", auth.apiKey);
-      } else if (auth?.login && auth?.password) {
-        request.headers.set(
-          "Authorization",
-          `Basic ${btoa(`${auth.login}:${auth.password}`)}`,
-        );
+      for (const [name, value] of Object.entries(authHeaders())) {
+        request.headers.set(name, value);
       }
       // Не перетираем Content-Type, если он уже явно задан вызывающим кодом
       // (например, "application/octet-stream" при загрузке файла в
@@ -59,16 +67,28 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
       if (!request.headers.has("Content-Type")) {
         request.headers.set("Content-Type", "application/json");
       }
-      if (proxyUrl) {
-        request.headers.set("X-Redmine-Target", baseUrl);
-      }
       return request;
     },
   };
 
   client.use(authMiddleware);
 
-  return client;
+  /**
+   * Сырой fetch к тому же инстансу (через прокси или напрямую) с теми же
+   * заголовками авторизации, что и у типизированного клиента выше - нужен
+   * там, где openapi-fetch не годится: например, загрузка файла на
+   * `/uploads.json` ждет сырое бинарное тело, а не JSON (см.
+   * src/api/files.ts). `path` - без базового URL, начинается с `/`.
+   */
+  function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers);
+    for (const [name, value] of Object.entries(authHeaders())) {
+      headers.set(name, value);
+    }
+    return fetch(`${fetchBaseUrl}${path}`, { ...init, headers });
+  }
+
+  return Object.assign(client, { rawFetch });
 }
 
 export type RedmineClient = ReturnType<typeof createRedmineClient>;

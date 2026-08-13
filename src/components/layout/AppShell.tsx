@@ -11,6 +11,7 @@ export interface AppShellProps
 /** Общий каркас: темный сайдбар слева + топ-бар и контент справа. */
 export function AppShell({
   children,
+  client,
   projects,
   projectsLoading,
   selectedProjectId,
@@ -25,6 +26,7 @@ export function AppShell({
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
+          client={client}
           projects={projects}
           projectsLoading={projectsLoading}
           selectedProjectId={selectedProjectId}
