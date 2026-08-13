@@ -5,7 +5,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, LayoutTemplate, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,6 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +36,7 @@ import {
   IssueFormFields,
   type IssueFormValues,
 } from "@/components/issues/IssueFormFields";
+import { SaveTemplateDialog } from "@/components/issues/SaveTemplateDialog";
 import type { RedmineClient } from "@/api/client";
 import type { AuthUser } from "@/contexts/AuthContext";
 import type { Project } from "@/hooks/useProjects";
@@ -40,6 +48,7 @@ import {
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectCategories } from "@/hooks/useProjectCategories";
 import { useProjectVersions } from "@/hooks/useProjectVersions";
+import { useIssueTemplates } from "@/hooks/useIssueTemplates";
 import {
   createIssue,
   type IssueCreateInput,
@@ -74,6 +83,8 @@ export interface CreateIssueDialogProps {
   defaultProjectId?: number | null;
   /** Текущий пользователь - подмешивается в список исполнителей, см. useProjectMembers. */
   currentUser?: AuthUser | null;
+  /** Для шаблонов задач (localStorage, ключ по инстансу+пользователю) - см. useIssueTemplates. */
+  baseUrl?: string | null;
   onCreated: (issue: IssueSummary) => void;
   /** Управляемое состояние открытия - если не передано, диалог сам открывается по клику на trigger. */
   open?: boolean;
@@ -91,6 +102,7 @@ export function CreateIssueDialog({
   projects,
   defaultProjectId,
   currentUser,
+  baseUrl,
   onCreated,
   open: controlledOpen,
   onOpenChange: setControlledOpen,
@@ -108,6 +120,11 @@ export function CreateIssueDialog({
   const { members } = useProjectMembers(client, projectId, currentUser);
   const { categories } = useProjectCategories(client, projectId);
   const { versions } = useProjectVersions(client, projectId);
+  const {
+    templates,
+    save: saveTemplate,
+    remove: removeTemplate,
+  } = useIssueTemplates(baseUrl ?? null, currentUser?.id);
 
   const projectFieldId = useId();
 
@@ -149,6 +166,28 @@ export function CreateIssueDialog({
     value: IssueFormValues[K],
   ) {
     setValues((v) => ({ ...v, [field]: value }));
+  }
+
+  function applyTemplate(id: string) {
+    const template = templates.find((t) => t.id === id);
+    if (!template) return;
+    setValues((v) => ({
+      ...v,
+      trackerId: template.trackerId ?? v.trackerId,
+      priorityId: template.priorityId ?? v.priorityId,
+      categoryId: template.categoryId ?? v.categoryId,
+      description: template.description || v.description,
+    }));
+  }
+
+  function handleSaveTemplate(name: string) {
+    saveTemplate({
+      name,
+      trackerId: values.trackerId,
+      priorityId: values.priorityId,
+      categoryId: values.categoryId,
+      description: values.description,
+    });
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -210,7 +249,60 @@ export function CreateIssueDialog({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Новая задача</DialogTitle>
+            {/* pr-8 - место под встроенную кнопку закрытия DialogContent (absolute top-2 right-2, ~28px) - иначе "Шаблон" наезжает на неё. */}
+            <div className="flex items-center justify-between gap-2 pr-8">
+              <DialogTitle>Новая задача</DialogTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                  >
+                    <LayoutTemplate className="size-3.5" />
+                    Шаблон
+                    <ChevronDown className="size-3.5 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {templates.length === 0 && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      Шаблонов пока нет
+                    </div>
+                  )}
+                  {templates.map((t) => (
+                    <DropdownMenuItem
+                      key={t.id}
+                      onSelect={() => applyTemplate(t.id)}
+                      className="justify-between gap-2"
+                    >
+                      {t.name}
+                      <button
+                        type="button"
+                        aria-label={`Удалить шаблон «${t.name}»`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeTemplate(t.id);
+                        }}
+                        className="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <SaveTemplateDialog
+                    onSave={handleSaveTemplate}
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        Сохранить текущее как шаблон...
+                      </DropdownMenuItem>
+                    }
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <DialogDescription>
               Обязательны только проект и тема - остальное можно уточнить позже.
             </DialogDescription>

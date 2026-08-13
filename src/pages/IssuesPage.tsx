@@ -147,6 +147,7 @@ export function IssuesPage() {
             projects={creatableProjects}
             defaultProjectId={selectedProjectId}
             currentUser={user}
+            baseUrl={baseUrl}
             onCreated={(issue) => navigate(`/issues/${issue.id}`)}
             trigger={
               <Button size="sm" className="gap-1.5">

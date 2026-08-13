@@ -20,7 +20,7 @@ function initials(firstname: string, lastname: string): string {
 
 /** Общий каркас авторизованной части приложения - сайдбар/топбар + текущий раздел. */
 export function AppLayout() {
-  const { user, client, can, logout } = useAuth();
+  const { user, client, baseUrl, can, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { projects, isLoading: projectsLoading } = useProjects(client);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
@@ -84,6 +84,7 @@ export function AppLayout() {
         projects={creatableProjects}
         defaultProjectId={selectedProjectId}
         currentUser={user}
+        baseUrl={baseUrl}
         open={isCreateIssueOpen}
         onOpenChange={setIsCreateIssueOpen}
         onCreated={(issue) => {
