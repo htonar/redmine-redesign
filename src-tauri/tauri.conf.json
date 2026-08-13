@@ -1,7 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Redfine",
-  "version": "0.1.0",
   "identifier": "com.htonar.redfine",
   "build": {
     "frontendDist": "../dist",
