@@ -1,0 +1,91 @@
+name: Desktop release (Tauri)
+
+# Только ручной запуск - осознанно не triggers: push/pull_request. Сборка
+# полной матрицы (win/macOS/linux, ~5-10 минут на платформу) по каждому пушу
+# в main была бы лишней тратой минут CI на десктоп-дистрибутив, который
+# пользователи не тянут на каждый коммит - только когда реально нужен новый
+# релиз. См. CLAUDE.md, "Бэклог: паковка в десктоп-приложение + CI/CD".
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия релиза (semver, без 'v' - например 0.2.0)"
+        required: true
+      prerelease:
+        description: "Пометить релиз как pre-release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# Все платформы матрицы пишут в один и тот же тег/релиз (redfine-v<version>) -
+# без этого два случайно параллельных запуска на одну версию могли бы
+# конфликтовать друг с другом при создании тега.
+concurrency:
+  group: desktop-release-${{ inputs.version }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS - universal binary (Apple Silicon + Intel одним артефактом),
+          # стандартная рекомендация Tauri для macos-latest раннеров.
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Версия - только через ручной ввод при запуске (см. описание триггера
+      # выше), не производная от git-тега/пуша. Поле "version" в
+      # src-tauri/tauri.conf.json намеренно не задано (JSON, комментарии
+      # недоступны, поясняем здесь) - Tauri сам подхватывает версию из
+      # package.json, если она там не указана явно, так что правки этим
+      # шагом достаточно на обе стороны (npm-пакет и Tauri-бандл).
+      - name: Set version
+        run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: redfine-v${{ inputs.version }}
+          releaseName: "Redfine v${{ inputs.version }}"
+          releaseBody: "См. CLAUDE.md в репозитории для истории изменений."
+          # Черновик - сознательно: даже успешная сборка матрицы не публикует
+          # релиз сама, кто-то должен глазами проверить артефакты и нажать
+          # "Publish" в GitHub UI, прежде чем он станет виден пользователям.
+          releaseDraft: true
+          prerelease: ${{ inputs.prerelease }}
+          args: ${{ matrix.args }}
