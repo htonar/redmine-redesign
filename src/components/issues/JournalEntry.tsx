@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import type { Issue } from "@/api/issues";
+import type { Attachment } from "@/api/attachments";
+import type { RedmineClient } from "@/api/client";
 import { FIELD_LABELS, formatDateTime } from "@/lib/journal-format";
+import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 
 interface JournalEntryProps {
   journal: NonNullable<Issue["journals"]>[number];
@@ -19,6 +22,13 @@ interface JournalEntryProps {
    * такие записи там покажут "Поле #N" вместо имени, это не баг, а fallback.
    */
   customFieldNames?: Record<number, string>;
+  /**
+   * Вложения задачи и клиент - для резолва картинок, вставленных по Ctrl+V
+   * прямо в комментарий (см. MarkdownContent). Опционально - ActivityFeed на
+   * дашборде их не грузит, комментарии там просто без инлайн-картинок.
+   */
+  attachments?: Attachment[];
+  client?: RedmineClient | null;
 }
 
 /** Одна запись истории изменений/комментарий - переиспользуется в карточке задачи и в ленте активности. */
@@ -26,6 +36,8 @@ export function JournalEntry({
   journal,
   header,
   customFieldNames,
+  attachments,
+  client,
 }: JournalEntryProps) {
   return (
     <div className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
@@ -37,7 +49,11 @@ export function JournalEntry({
         {formatDateTime(journal.created_on)}
       </div>
       {journal.notes && (
-        <p className="text-sm whitespace-pre-wrap">{journal.notes}</p>
+        <MarkdownContent
+          text={journal.notes}
+          attachments={attachments}
+          client={client}
+        />
       )}
       {journal.details.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">

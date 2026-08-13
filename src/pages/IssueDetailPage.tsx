@@ -22,7 +22,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -64,10 +63,13 @@ import {
   downloadAttachment,
   uploadAttachment,
   type Attachment,
+  type UploadedFile,
 } from "@/api/attachments";
 import { addWatcher, removeWatcher } from "@/api/watchers";
 import { JournalEntry } from "@/components/issues/JournalEntry";
 import { IssuePicker } from "@/components/issues/IssuePicker";
+import { MarkdownContent } from "@/components/markdown/MarkdownContent";
+import { MarkdownEditor } from "@/components/markdown/MarkdownEditor";
 import {
   RELATION_TYPE_INVERSE,
   RELATION_TYPE_LABELS,
@@ -262,6 +264,11 @@ export function IssueDetailPage() {
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Файлы, вставленные по Ctrl+V в комментарий - см. MarkdownEditor, CLAUDE.md
+  // "Markdown-редактор".
+  const [pendingCommentUploads, setPendingCommentUploads] = useState<
+    UploadedFile[]
+  >([]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<IssueFormValues | null>(null);
@@ -269,6 +276,11 @@ export function IssueDetailPage() {
     useState<IssueFormValues | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  // Файлы, вставленные по Ctrl+V в описание в режиме правки - см.
+  // MarkdownEditor, CLAUDE.md "Markdown-редактор".
+  const [pendingDescriptionUploads, setPendingDescriptionUploads] = useState<
+    UploadedFile[]
+  >([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -315,6 +327,7 @@ export function IssueDetailPage() {
     setEditValues(values);
     setEditInitialValues(values);
     setEditError(null);
+    setPendingDescriptionUploads([]);
     setIsEditing(true);
   }
 
@@ -323,6 +336,7 @@ export function IssueDetailPage() {
     setEditValues(null);
     setEditInitialValues(null);
     setEditError(null);
+    setPendingDescriptionUploads([]);
   }
 
   // Хоткей "e" - редактировать открытую задачу (см. CLAUDE.md, "Горячие
@@ -353,6 +367,24 @@ export function IssueDetailPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issue, isEditing, projectId]);
+
+  // Ctrl/Cmd+S - сохранить форму правки задачи (по просьбе пользователя,
+  // как альтернатива Ctrl+Enter в комментарии). В отличие от хоткея "e" выше,
+  // работает даже когда фокус внутри самой формы (в полях/textarea) - иначе
+  // сохранять было бы неоткуда, кроме мыши. Браузер по умолчанию перехватывает
+  // Ctrl+S под "Сохранить страницу" - обязательно preventDefault.
+  useEffect(() => {
+    if (!isEditing) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return;
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "s") return;
+      e.preventDefault();
+      handleSaveEdit();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, editValues, editInitialValues]);
 
   function updateEditField<K extends keyof IssueFormValues>(
     field: K,
@@ -619,6 +651,12 @@ export function IssueDetailPage() {
     }
 
     const patch = diffFormValues(editInitialValues, editValues);
+    // Файлы, вставленные по Ctrl+V в описание (см. MarkdownEditor) - нужно
+    // отправить, даже если больше ничего в форме не поменялось (иначе токен
+    // загрузки останется никуда не прикреплённым).
+    if (pendingDescriptionUploads.length > 0) {
+      patch.uploads = pendingDescriptionUploads;
+    }
     if (Object.keys(patch).length === 0) {
       setIsEditing(false);
       return;
@@ -635,6 +673,7 @@ export function IssueDetailPage() {
       setIsEditing(false);
       setEditValues(null);
       setEditInitialValues(null);
+      setPendingDescriptionUploads([]);
       reload();
     } catch (e) {
       setEditError(
@@ -688,8 +727,13 @@ export function IssueDetailPage() {
     setIsSavingComment(true);
     setActionError(null);
     try {
-      await updateIssue(client, issue.id, { notes: comment });
+      await updateIssue(client, issue.id, {
+        notes: comment,
+        uploads:
+          pendingCommentUploads.length > 0 ? pendingCommentUploads : undefined,
+      });
       setComment("");
+      setPendingCommentUploads([]);
       reload();
     } catch (e) {
       setActionError(
@@ -833,6 +877,10 @@ export function IssueDetailPage() {
                   categories={categories}
                   versions={versions}
                   subjectRequired
+                  client={client}
+                  onDescriptionUpload={(f) =>
+                    setPendingDescriptionUploads((prev) => [...prev, f])
+                  }
                 />
 
                 {editError && (
@@ -924,9 +972,11 @@ export function IssueDetailPage() {
                     <CardTitle>Описание</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {issue.description}
-                    </p>
+                    <MarkdownContent
+                      text={issue.description}
+                      attachments={issue.attachments}
+                      client={client}
+                    />
                   </CardContent>
                 </Card>
               )}
@@ -1395,6 +1445,8 @@ export function IssueDetailPage() {
                       key={j.id}
                       journal={j}
                       customFieldNames={customFieldNames}
+                      attachments={issue.attachments}
+                      client={client}
                     />
                   ))
                 ) : (
@@ -1405,16 +1457,16 @@ export function IssueDetailPage() {
               </div>
 
               <div className="flex flex-col gap-2 border-t border-border pt-3">
-                <Textarea
+                <MarkdownEditor
+                  client={client}
                   placeholder="Добавить комментарий..."
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddComment();
-                    }
-                  }}
+                  onChange={setComment}
+                  onUpload={(f) =>
+                    setPendingCommentUploads((prev) => [...prev, f])
+                  }
+                  onSubmitShortcut={handleAddComment}
+                  rows={3}
                 />
                 <Button
                   size="sm"
