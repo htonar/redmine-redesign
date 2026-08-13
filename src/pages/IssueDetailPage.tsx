@@ -72,6 +72,7 @@ import {
 } from "@/lib/issue-relations";
 import { formatDateTime } from "@/lib/journal-format";
 import { formatFileSize } from "@/lib/utils";
+import { celebrate } from "@/lib/celebrate";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", {
@@ -537,6 +538,11 @@ export function IssueDetailPage() {
     setIsSavingEdit(true);
     try {
       await updateIssue(client, issue.id, patch);
+      // Мягкая геймификация - confetti при выходе на 100% готовности через
+      // форму правки (независимо от смены статуса выше). См. lib/celebrate.ts.
+      if (patch.doneRatio === 100 && editInitialValues.doneRatio !== 100) {
+        celebrate();
+      }
       setIsEditing(false);
       setEditValues(null);
       setEditInitialValues(null);
@@ -572,6 +578,12 @@ export function IssueDetailPage() {
     setActionError(null);
     try {
       await updateIssue(client, issue.id, { statusId: Number(statusId) });
+      // Мягкая геймификация - confetti при закрытии задачи (переход в статус
+      // is_closed, не при каждой смене статуса). См. lib/celebrate.ts.
+      const targetIsClosed = issue.allowed_statuses?.find(
+        (s) => s.id === Number(statusId),
+      )?.is_closed;
+      if (targetIsClosed && !issue.status?.is_closed) celebrate();
       reload();
     } catch (e) {
       setActionError(
