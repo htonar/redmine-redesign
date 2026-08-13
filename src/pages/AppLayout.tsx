@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
 import { HotkeysHelpDialog } from "@/components/layout/HotkeysHelpDialog";
+import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useProjects } from "@/hooks/useProjects";
@@ -96,6 +97,8 @@ export function AppLayout() {
         open={isHotkeysHelpOpen}
         onOpenChange={setIsHotkeysHelpOpen}
       />
+      {/* Автообновление (только десктоп-сборка) - сама себя скрывает в вебе. */}
+      <UpdateBanner />
     </TooltipProvider>
   );
 }

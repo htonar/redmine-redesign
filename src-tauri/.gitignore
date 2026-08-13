@@ -2,3 +2,10 @@
 # will have compiled files and executables
 /target/
 /gen/schemas
+
+# Ключ подписи обновлений (сгенерирован `tauri signer generate`) - секрет,
+# используется только локально/в CI (TAURI_SIGNING_PRIVATE_KEY). Публичный
+# .pub переносится в tauri.conf.json (plugins.updater.pubkey) вручную и уже
+# не секрет, но тоже не нужен в репозитории.
+updater.key
+updater.key.pub

@@ -29,3 +29,9 @@ tauri-plugin-log = "2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 base64 = "0.22"
 tokio = { version = "1", features = ["rt"] }
+# Автообновление (GitHub issue #2) - default-features выключены по той же
+# причине, что и у reqwest выше: без rustls-tls плагин тянет native-tls
+# (системную OpenSSL), которой нет по умолчанию на Windows/чистых сборочных
+# образах.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
+tauri-plugin-process = "2"

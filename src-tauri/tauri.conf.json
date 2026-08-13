@@ -36,6 +36,15 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFBQTgwNkRDQjkwMTU2OTgKUldTWVZnRzUzQWFvcWl1d3YyY09xcHFrV3NrOElKQytXWjk0SWNWNm1LaXJJSkF4bGk0SXZ5eWUK",
+      "endpoints": [
+        "https://github.com/htonar/redmine-redesign/releases/latest/download/latest.json"
+      ]
     }
   }
 }

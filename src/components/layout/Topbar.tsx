@@ -6,12 +6,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import type { Project } from "@/hooks/useProjects";
 import { getGravatarUrl } from "@/lib/gravatar";
 import type { RedmineClient } from "@/api/client";
+import { useAppUpdater } from "@/hooks/useAppUpdater";
 
 export interface CurrentUser {
   name: string;
@@ -47,6 +49,7 @@ export function Topbar({
   onShowHotkeysHelp,
 }: TopbarProps) {
   const navigate = useNavigate();
+  const updater = useAppUpdater();
   const currentProjectName =
     projects.find((p) => p.id === selectedProjectId)?.name ?? "Все проекты";
 
@@ -132,6 +135,21 @@ export function Topbar({
             <DropdownMenuItem onSelect={() => navigate("/profile")}>
               Профиль
             </DropdownMenuItem>
+            {updater.supported && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={updater.status === "checking"}
+                  onSelect={updater.checkForUpdate}
+                >
+                  {updater.status === "checking"
+                    ? "Проверка обновлений..."
+                    : updater.status === "none"
+                      ? "Обновлений нет"
+                      : "Проверить обновления"}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem variant="destructive" onSelect={onLogout}>
               Выйти
             </DropdownMenuItem>

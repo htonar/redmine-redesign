@@ -79,6 +79,18 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Автообновление (GitHub issue #2, @tauri-apps/plugin-updater) -
+          # без этих двух секретов tauri-action соберет бандлы, но не
+          # подпишет их и не создаст latest.json, и обновление в
+          # приложении никогда не найдет новую версию (публичный ключ уже
+          # зашит в src-tauri/tauri.conf.json, plugins.updater.pubkey -
+          # приватный существует только как секрет репозитория, в
+          # исходниках его нет и не должно быть). createUpdaterArtifacts:
+          # true в tauri.conf.json - сигнал самому Tauri CLI генерировать
+          # .sig-файлы и latest.json, tauri-action просто прокидывает
+          # переменные окружения, которые CLI ожидает для подписи.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: redfine-v${{ inputs.version }}
           releaseName: "Redfine v${{ inputs.version }}"
