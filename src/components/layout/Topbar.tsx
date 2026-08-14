@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { NotificationsBell, type NotificationsBellProps } from "@/components/layout/NotificationsBell";
 import type { Project } from "@/hooks/useProjects";
 import { getGravatarUrl } from "@/lib/gravatar";
 import type { RedmineClient } from "@/api/client";
@@ -33,6 +34,7 @@ export interface TopbarProps {
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onShowHotkeysHelp?: () => void;
+  notifications: NotificationsBellProps;
 }
 
 /** Верхняя панель рабочей области: поиск, переключатель проекта, пользователь. */
@@ -47,6 +49,7 @@ export function Topbar({
   theme,
   onToggleTheme,
   onShowHotkeysHelp,
+  notifications,
 }: TopbarProps) {
   const navigate = useNavigate();
   const updater = useAppUpdater();
@@ -86,6 +89,8 @@ export function Topbar({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <NotificationsBell {...notifications} />
 
         {onShowHotkeysHelp && (
           <Button

@@ -116,4 +116,14 @@ describe("listIssues", () => {
     await listIssues(mockClient(GET), baseParams);
     expect(GET.mock.calls[0][1].params.query.query_id).toBeUndefined();
   });
+
+  it("watcher 'me' -> watcher_id: 'me', не задан -> undefined", async () => {
+    const GET = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET), { ...baseParams, watcher: "me" });
+    expect(GET.mock.calls[0][1].params.query.watcher_id).toBe("me");
+
+    const GET2 = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET2), baseParams);
+    expect(GET2.mock.calls[0][1].params.query.watcher_id).toBeUndefined();
+  });
 });

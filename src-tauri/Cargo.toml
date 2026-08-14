@@ -35,3 +35,6 @@ tokio = { version = "1", features = ["rt"] }
 # образах.
 tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
 tauri-plugin-process = "2"
+# OS push-уведомления (issue #3) - назначение задачи, смена статуса,
+# активность по наблюдаемым задачам, приближение дедлайна.
+tauri-plugin-notification = "2"

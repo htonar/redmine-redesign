@@ -11,6 +11,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useProjects } from "@/hooks/useProjects";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface LayoutContext {
   selectedProjectId: number | null;
@@ -31,6 +32,11 @@ export function AppLayout() {
     user?.id,
     "selected-project",
     null,
+  );
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(
+    client,
+    baseUrl,
+    user?.id,
   );
   const navigate = useNavigate();
   const location = useLocation();
@@ -78,6 +84,7 @@ export function AppLayout() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onShowHotkeysHelp={() => setIsHotkeysHelpOpen(true)}
+        notifications={{ notifications, unreadCount, onMarkRead: markRead, onMarkAllRead: markAllRead }}
       >
         {/* key на путь - при переходе на другую страницу пойманная ошибка
             не "залипает" на исправно работающем разделе. */}

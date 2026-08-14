@@ -10,6 +10,14 @@ export interface IssueListFilters {
   assignee: "me" | "all";
   /** open/closed - как в статус-фильтре Redmine (o/c), all - без фильтра (*). */
   status: "open" | "closed" | "all";
+  /**
+   * "me" - только задачи, за которыми пользователь следит как наблюдатель
+   * (`watcher_id=me`, см. Redmine REST API - недокументирован в основном
+   * описании ресурса, но есть в списке фильтров). Не задан - без фильтра по
+   * наблюдателям. Используется поллингом уведомлений (issue #3), не UI
+   * списка задач.
+   */
+  watcher?: "me";
   /** Формат Redmine: `field:desc`, например `updated_on:desc`. */
   sort: string;
   /**
@@ -59,6 +67,7 @@ export async function listIssues(
             project_id: params.projectId ? String(params.projectId) : undefined,
             assigned_to_id: params.assignee === "me" ? "me" : undefined,
             status_id: STATUS_QUERY[params.status],
+            watcher_id: params.watcher === "me" ? "me" : undefined,
           },
     },
   });

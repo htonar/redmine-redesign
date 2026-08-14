@@ -20,6 +20,7 @@ export function AppShell({
   theme,
   onToggleTheme,
   onShowHotkeysHelp,
+  notifications,
 }: AppShellProps) {
   return (
     <div className="flex h-svh bg-background text-foreground">
@@ -36,6 +37,7 @@ export function AppShell({
           theme={theme}
           onToggleTheme={onToggleTheme}
           onShowHotkeysHelp={onShowHotkeysHelp}
+          notifications={notifications}
         />
         <main className="flex-1 overflow-auto bg-muted/40 p-6">{children}</main>
       </div>

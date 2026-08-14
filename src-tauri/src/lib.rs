@@ -10,6 +10,9 @@ pub fn run() {
     // себе desktop-only и no-op собрать для mobile не пытаются).
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
+    // OS push-уведомления (GitHub issue #3) - desktop-only, как остальные
+    // плагины выше.
+    .plugin(tauri_plugin_notification::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
