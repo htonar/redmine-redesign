@@ -35,15 +35,27 @@ export async function tauriFetch(request: Request): Promise<Response> {
     bodyBase64,
   });
 
+  // Статусы 204/205/304 - "null body status" по Fetch-спеке: Response не
+  // может принять тело вообще, даже пустое - `new Response(new Blob([]), {
+  // status: 204 })` бросает "Response with null body status cannot have
+  // body". Redmine возвращает 204 без тела на большинство мутаций (например
+  // PUT /issues/{id}.json при смене статуса задачи) - именно это ловили как
+  // баг (issue #18).
+  const isNullBodyStatus =
+    result.status === 204 || result.status === 205 || result.status === 304;
+
   // Blob, а не сырой Uint8Array - у TS/lib.dom.d.ts несовпадение типов между
   // Uint8Array<ArrayBufferLike> и BodyInit в некоторых версиях (не рантайм-
   // проблема, только типизация); Blob однозначно принимается везде.
-  return new Response(new Blob([base64ToBytes(result.body_base64)]), {
-    status: result.status,
-    headers: result.content_type
-      ? { "content-type": result.content_type }
-      : undefined,
-  });
+  return new Response(
+    isNullBodyStatus ? null : new Blob([base64ToBytes(result.body_base64)]),
+    {
+      status: result.status,
+      headers: result.content_type
+        ? { "content-type": result.content_type }
+        : undefined,
+    },
+  );
 }
 
 // btoa/atob работают только с "бинарной строкой" (по символу на байт) - для
