@@ -61,11 +61,11 @@ import {
 import { createTimeEntry, type TimeEntryInput } from "@/api/timeEntries";
 import {
   deleteAttachment,
-  downloadAttachment,
   uploadAttachment,
   type Attachment,
   type UploadedFile,
 } from "@/api/attachments";
+import { AttachmentPreviewDialog } from "@/components/issues/AttachmentPreviewDialog";
 import { addWatcher, removeWatcher } from "@/api/watchers";
 import { JournalEntry } from "@/components/issues/JournalEntry";
 import { IssuePicker } from "@/components/issues/IssuePicker";
@@ -237,9 +237,7 @@ export function IssueDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<
-    number | null
-  >(null);
+  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
   const [removingAttachmentId, setRemovingAttachmentId] = useState<
     number | null
   >(null);
@@ -478,21 +476,6 @@ export function IssueDetailPage() {
     // Сбрасываем value - иначе повторный выбор того же файла не вызовет onChange.
     e.target.value = "";
     if (file) void handleUploadFile(file);
-  }
-
-  async function handleDownloadAttachment(attachment: Attachment) {
-    if (!client) return;
-    setAttachmentError(null);
-    setDownloadingAttachmentId(attachment.id);
-    try {
-      await downloadAttachment(client, attachment);
-    } catch (e) {
-      setAttachmentError(
-        e instanceof Error ? e.message : "Не удалось скачать файл.",
-      );
-    } finally {
-      setDownloadingAttachmentId(null);
-    }
   }
 
   async function handleRemoveAttachment(attachmentId: number) {
@@ -835,6 +818,13 @@ export function IssueDetailPage() {
             description={`«${issue.subject}» будет удалена без возможности восстановления.`}
             onConfirm={handleDelete}
             isConfirming={isDeleting}
+          />
+
+          <AttachmentPreviewDialog
+            attachment={previewAttachment}
+            client={client}
+            open={previewAttachment !== null}
+            onOpenChange={(open) => !open && setPreviewAttachment(null)}
           />
 
           {isEditing && editValues ? (
@@ -1221,15 +1211,10 @@ export function IssueDetailPage() {
                     >
                       <button
                         type="button"
-                        className="flex min-w-0 items-center gap-1.5 text-left hover:underline disabled:opacity-50"
-                        onClick={() => handleDownloadAttachment(a)}
-                        disabled={downloadingAttachmentId === a.id}
+                        className="flex min-w-0 items-center gap-1.5 text-left hover:underline"
+                        onClick={() => setPreviewAttachment(a)}
                       >
-                        {downloadingAttachmentId === a.id ? (
-                          <Loader2 className="size-3.5 shrink-0 animate-spin" />
-                        ) : (
-                          <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
-                        )}
+                        <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
                         <span className="truncate">{a.filename}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">
                           ({formatFileSize(a.filesize)})

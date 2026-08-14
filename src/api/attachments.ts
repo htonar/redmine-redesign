@@ -1,5 +1,6 @@
 import type { RedmineClient } from "@/api/client";
 import type { components } from "@/api/schema";
+import { downloadBlob } from "@/lib/blob-download";
 
 export type Attachment = components["schemas"]["attachment"];
 
@@ -53,31 +54,36 @@ export async function uploadAttachment(
 }
 
 /**
- * Скачивание вложения через тот же (прокси-осведомленный, авторизованный)
- * клиент, а не прямой `<a href={attachment.content_url}>` - content_url
- * ведет напрямую на Redmine-хост, простая навигация браузера не понесет
- * заголовок X-Redmine-API-Key, а сам Redmine обычно требует авторизацию даже
- * на скачивание. Вместо этого - blob через клиент и локальный object URL.
+ * Тянет сырые байты вложения через тот же (прокси-осведомленный,
+ * авторизованный) клиент, а не прямой `<a href={attachment.content_url}>` -
+ * content_url ведет напрямую на Redmine-хост, простая навигация браузера не
+ * понесет заголовок X-Redmine-API-Key, а сам Redmine обычно требует
+ * авторизацию даже на скачивание. Общий кусок для быстрого скачивания
+ * (downloadAttachment) и предпросмотра (AttachmentPreviewDialog), которому
+ * нужен сам blob, а не немедленный клик по <a download>.
  */
-export async function downloadAttachment(
+export async function fetchAttachmentBlob(
   client: RedmineClient,
   attachment: Attachment,
-): Promise<void> {
+): Promise<Blob> {
   const { data, error } = await client.GET("/attachments/download/{attachment_id}/{filename}", {
     params: { path: { attachment_id: attachment.id, filename: attachment.filename } },
     parseAs: "blob",
   });
 
   if (error || !data) {
-    throw new Error(`Не удалось скачать файл "${attachment.filename}".`);
+    throw new Error(`Не удалось загрузить файл "${attachment.filename}".`);
   }
 
-  const url = URL.createObjectURL(data as Blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = attachment.filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  return data as Blob;
+}
+
+export async function downloadAttachment(
+  client: RedmineClient,
+  attachment: Attachment,
+): Promise<void> {
+  const blob = await fetchAttachmentBlob(client, attachment);
+  downloadBlob(blob, attachment.filename);
 }
 
 /** Удаление уже прикрепленного файла - по id самого вложения. */
