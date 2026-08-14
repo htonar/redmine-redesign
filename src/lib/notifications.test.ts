@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   diffIssuesForNotifications,
+  filterNotificationsByTriggers,
+  type AppNotification,
   type DiffIssuesInput,
   type IssueSnapshot,
 } from "@/lib/notifications";
@@ -357,5 +359,49 @@ describe("diffIssuesForNotifications", () => {
     );
 
     expect(result.notifications).toHaveLength(1);
+  });
+});
+
+describe("filterNotificationsByTriggers", () => {
+  function notification(trigger: AppNotification["trigger"]): AppNotification {
+    return {
+      id: `1-${trigger}`,
+      issueId: 1,
+      issueSubject: "Тестовая задача",
+      trigger,
+      message: "сообщение",
+      createdAt: NOW.toISOString(),
+      read: false,
+    };
+  }
+
+  it("оставляет только уведомления по включенным триггерам", () => {
+    const notifications = [
+      notification("assigned"),
+      notification("status_changed"),
+      notification("due_soon"),
+    ];
+
+    const result = filterNotificationsByTriggers(notifications, {
+      assigned: true,
+      status_changed: false,
+      activity: true,
+      due_soon: false,
+    });
+
+    expect(result.map((n) => n.trigger)).toEqual(["assigned"]);
+  });
+
+  it("пропускает все уведомления, если все триггеры включены", () => {
+    const notifications = [notification("assigned"), notification("activity")];
+
+    const result = filterNotificationsByTriggers(notifications, {
+      assigned: true,
+      status_changed: true,
+      activity: true,
+      due_soon: true,
+    });
+
+    expect(result).toEqual(notifications);
   });
 });

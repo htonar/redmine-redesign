@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
 import { HotkeysHelpDialog } from "@/components/layout/HotkeysHelpDialog";
 import { UpdateBanner } from "@/components/layout/UpdateBanner";
+import { NotificationSettingsDialog } from "@/components/layout/NotificationSettingsDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -12,6 +13,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { useNotifications } from "@/hooks/useNotifications";
+import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/notifications";
 
 interface LayoutContext {
   selectedProjectId: number | null;
@@ -33,15 +35,23 @@ export function AppLayout() {
     "selected-project",
     null,
   );
+  const [notificationSettings, setNotificationSettings] = usePersistedState(
+    baseUrl,
+    user?.id,
+    "notification-settings",
+    DEFAULT_NOTIFICATION_SETTINGS,
+  );
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(
     client,
     baseUrl,
     user?.id,
+    notificationSettings,
   );
   const navigate = useNavigate();
   const location = useLocation();
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
   const [isHotkeysHelpOpen, setIsHotkeysHelpOpen] = useState(false);
+  const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
 
   // Тот же фильтр по add_issues, что и кнопка "Добавить задачу" на IssuesPage
   // (см. docs/permissions.md) - хоткей "c" не должен подсовывать проект без прав.
@@ -84,7 +94,13 @@ export function AppLayout() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onShowHotkeysHelp={() => setIsHotkeysHelpOpen(true)}
-        notifications={{ notifications, unreadCount, onMarkRead: markRead, onMarkAllRead: markAllRead }}
+        notifications={{
+          notifications,
+          unreadCount,
+          onMarkRead: markRead,
+          onMarkAllRead: markAllRead,
+          onOpenSettings: () => setIsNotificationSettingsOpen(true),
+        }}
       >
         {/* key на путь - при переходе на другую страницу пойманная ошибка
             не "залипает" на исправно работающем разделе. */}
@@ -116,6 +132,12 @@ export function AppLayout() {
       <HotkeysHelpDialog
         open={isHotkeysHelpOpen}
         onOpenChange={setIsHotkeysHelpOpen}
+      />
+      <NotificationSettingsDialog
+        open={isNotificationSettingsOpen}
+        onOpenChange={setIsNotificationSettingsOpen}
+        settings={notificationSettings}
+        onChange={setNotificationSettings}
       />
       {/* Автообновление (только десктоп-сборка) - сама себя скрывает в вебе. */}
       <UpdateBanner />

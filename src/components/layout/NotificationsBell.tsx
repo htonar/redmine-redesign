@@ -1,4 +1,4 @@
-import { Bell } from "lucide-react";
+import { Bell, Settings } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ export interface NotificationsBellProps {
   unreadCount: number;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onOpenSettings: () => void;
 }
 
 /**
@@ -37,6 +38,7 @@ export function NotificationsBell({
   unreadCount,
   onMarkRead,
   onMarkAllRead,
+  onOpenSettings,
 }: NotificationsBellProps) {
   const navigate = useNavigate();
 
@@ -55,15 +57,25 @@ export function NotificationsBell({
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between gap-2">
           Уведомления
-          {unreadCount > 0 && (
+          <span className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={onMarkAllRead}
+                className="text-xs font-normal text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Прочитать всё
+              </button>
+            )}
             <button
               type="button"
-              onClick={onMarkAllRead}
-              className="text-xs font-normal text-muted-foreground hover:text-foreground hover:underline"
+              aria-label="Настройки уведомлений"
+              onClick={onOpenSettings}
+              className="text-muted-foreground hover:text-foreground"
             >
-              Прочитать всё
+              <Settings className="size-3.5" />
             </button>
-          )}
+          </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {notifications.length === 0 ? (

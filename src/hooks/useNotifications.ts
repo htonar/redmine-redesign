@@ -3,8 +3,10 @@ import type { RedmineClient } from "@/api/client";
 import { listIssues } from "@/api/issues";
 import {
   diffIssuesForNotifications,
+  filterNotificationsByTriggers,
+  NOTIFICATION_TRIGGER_LABELS,
   type AppNotification,
-  type NotificationTrigger,
+  type NotificationSettings,
 } from "@/lib/notifications";
 import {
   loadNotificationsState,
@@ -16,19 +18,10 @@ import {
 } from "@/lib/notifications-storage";
 import { sendOsNotification } from "@/lib/os-notifications";
 
-/** Раз в сколько опрашиваем Redmine - середина диапазона 5-10 минут из issue #3. */
-const NOTIFICATIONS_POLL_INTERVAL_MS = 7 * 60 * 1000;
 /** За сколько дней до дедлайна начинаем напоминать. */
 const DUE_SOON_DAYS = 3;
 /** Срез задач за один опрос (assigned и watched запрашиваются отдельно). */
 const ISSUES_PER_QUERY_LIMIT = 100;
-
-const TRIGGER_TITLES: Record<NotificationTrigger, string> = {
-  assigned: "Новая задача",
-  status_changed: "Статус изменился",
-  activity: "Новая активность",
-  due_soon: "Дедлайн приближается",
-};
 
 export interface UseNotificationsResult {
   notifications: AppNotification[];
@@ -52,16 +45,15 @@ const emptyState = (): NotificationsState => ({
  * побочные эффекты), по образцу useAppUpdater.ts/useActivityFeed.ts, которые
  * по той же причине не покрыты юнит-тестами.
  *
- * Интервал и dueSoonDays - пока константы, не persisted-настройка: по итогам
- * обсуждения issue #3 UI для вкл/выкл и периода опроса - отдельный
- * follow-up. Хук уже принимает только client/baseUrl/userId, так что
- * добавить enabled/intervalMs параметрами можно будет без переписывания
- * диффа и стораджа.
+ * Настройки (вкл/выкл, триггеры, интервал, OS push) - issue #4, персистятся
+ * через usePersistedState на уровне вызывающего кода (AppLayout.tsx) и
+ * передаются сюда параметром - сам хук по-прежнему только оркестрация.
  */
 export function useNotifications(
   client: RedmineClient | null,
   baseUrl: string | null,
   userId: number | undefined,
+  settings: NotificationSettings,
 ): UseNotificationsResult {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   // Снэпшоты/notifiedDue/hasPolledBefore не участвуют в рендере напрямую -
@@ -79,6 +71,10 @@ export function useNotifications(
     let cancelled = false;
     pollStateRef.current = loadNotificationsState(activeBaseUrl, activeUserId);
     setNotifications(pollStateRef.current.notifications);
+
+    // Общий выключатель (issue #4) - не полирует Redmine вообще, но уже
+    // накопленные уведомления остаются видны в бейдже.
+    if (!settings.enabled) return;
 
     async function poll() {
       if (cancelled) return;
@@ -113,19 +109,31 @@ export function useNotifications(
           isFirstPoll: !prev.hasPolledBefore,
           now: new Date(),
         });
+        // Снэпшоты/notifiedDue сохраняем от диффа целиком (не отфильтрованные)
+        // - выключенный триггер не должен ломать сравнение на следующем
+        // опросе, если пользователь снова включит его.
+        const shownNotifications = filterNotificationsByTriggers(
+          diff.notifications,
+          settings.triggers,
+        );
 
         const nextState: NotificationsState = {
           snapshots: diff.snapshots,
           notifiedDue: diff.notifiedDue,
-          notifications: mergeNotifications(prev.notifications, diff.notifications),
+          notifications: mergeNotifications(prev.notifications, shownNotifications),
           hasPolledBefore: true,
         };
         pollStateRef.current = nextState;
         setNotifications(nextState.notifications);
         saveNotificationsState(activeBaseUrl, activeUserId, nextState);
 
-        for (const notification of diff.notifications) {
-          void sendOsNotification(TRIGGER_TITLES[notification.trigger], notification.message);
+        if (settings.osPushEnabled) {
+          for (const notification of shownNotifications) {
+            void sendOsNotification(
+              NOTIFICATION_TRIGGER_LABELS[notification.trigger],
+              notification.message,
+            );
+          }
         }
       } catch {
         // Один неудачный опрос (сеть, 403 и т.п.) не должен ронять таймер -
@@ -134,13 +142,16 @@ export function useNotifications(
     }
 
     void poll();
-    const interval = setInterval(() => void poll(), NOTIFICATIONS_POLL_INTERVAL_MS);
+    const interval = setInterval(
+      () => void poll(),
+      settings.intervalMinutes * 60 * 1000,
+    );
 
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [client, baseUrl, userId]);
+  }, [client, baseUrl, userId, settings]);
 
   const persistNotifications = useCallback(
     (updater: (current: AppNotification[]) => AppNotification[]) => {

@@ -63,6 +63,54 @@ export interface DiffIssuesResult {
   notifiedDue: Record<number, string>;
 }
 
+/**
+ * Настройки уведомлений (issue #4) - персистятся через usePersistedState
+ * (ключ "notification-settings", по образцу issue #6), не отдельным
+ * localStorage-модулем, потому что это просто объект без merge-логики поверх
+ * MAX_NOTIFICATIONS и т.п. (см. notifications-storage.ts для контраста).
+ */
+export interface NotificationSettings {
+  /** Общий выключатель - false останавливает опрос совсем, но не стирает уже полученные уведомления. */
+  enabled: boolean;
+  triggers: Record<NotificationTrigger, boolean>;
+  /** Интервал опроса Redmine, в минутах. Дефолт - середина диапазона 5-10 из issue #3. */
+  intervalMinutes: number;
+  /** Десктоп-сборка (Tauri) - OS push отдельно от in-app бейджа. В вебе не влияет ни на что (see os-notifications.ts). */
+  osPushEnabled: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  triggers: {
+    assigned: true,
+    status_changed: true,
+    activity: true,
+    due_soon: true,
+  },
+  intervalMinutes: 7,
+  osPushEnabled: true,
+};
+
+export const NOTIFICATION_TRIGGER_LABELS: Record<NotificationTrigger, string> = {
+  assigned: "Новая задача",
+  status_changed: "Статус изменился",
+  activity: "Новая активность",
+  due_soon: "Дедлайн приближается",
+};
+
+/**
+ * Отфильтровывает уведомления по выключенным триггерам (issue #4) - снэпшоты
+ * и notifiedDue из diffIssuesForNotifications применяются как есть, чтобы
+ * диф оставался консистентным при последующем включении триггера обратно;
+ * фильтруется только то, что реально показывается пользователю/шлется в OS.
+ */
+export function filterNotificationsByTriggers(
+  notifications: AppNotification[],
+  triggers: Record<NotificationTrigger, boolean>,
+): AppNotification[] {
+  return notifications.filter((n) => triggers[n.trigger]);
+}
+
 function buildSnapshot(issue: IssueSummary): IssueSnapshot {
   return {
     statusId: issue.status?.id ?? 0,

@@ -69,4 +69,17 @@ describe("savePersistedState / loadPersistedState", () => {
       "kanban",
     );
   });
+
+  it("персистит настройки уведомлений (issue #4)", () => {
+    const settings = {
+      enabled: false,
+      triggers: { assigned: true, status_changed: false, activity: true, due_soon: false },
+      intervalMinutes: 15,
+      osPushEnabled: false,
+    };
+    savePersistedState(BASE_URL, USER_ID, "notification-settings", settings);
+    expect(
+      loadPersistedState(BASE_URL, USER_ID, "notification-settings", null),
+    ).toEqual(settings);
+  });
 });
