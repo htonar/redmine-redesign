@@ -94,4 +94,26 @@ describe("listIssues", () => {
       "Не удалось загрузить список задач.",
     );
   });
+
+  it("queryId задан -> query_id передается, остальные фильтры не отправляются (Redmine их игнорирует)", async () => {
+    const GET = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET), {
+      ...baseParams,
+      queryId: 7,
+      projectId: 42,
+      assignee: "me",
+      status: "closed",
+    });
+    const query = GET.mock.calls[0][1].params.query;
+    expect(query.query_id).toBe(7);
+    expect(query.project_id).toBeUndefined();
+    expect(query.assigned_to_id).toBeUndefined();
+    expect(query.status_id).toBeUndefined();
+  });
+
+  it("queryId не задан -> query_id: undefined", async () => {
+    const GET = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET), baseParams);
+    expect(GET.mock.calls[0][1].params.query.query_id).toBeUndefined();
+  });
 });

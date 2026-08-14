@@ -12,6 +12,14 @@ export interface IssueListFilters {
   status: "open" | "closed" | "all";
   /** Формат Redmine: `field:desc`, например `updated_on:desc`. */
   sort: string;
+  /**
+   * Id нативного Query Redmine (`GET /queries.json`, см. src/api/queries.ts,
+   * issue #14). Когда задан, `listIssues` отправляет только `query_id` -
+   * Redmine применяет фильтры самого query и игнорирует остальные параметры
+   * фильтрации на сервере, так что отправлять их вместе означало бы вводить
+   * пользователя в заблуждение, будто они применяются одновременно.
+   */
+  queryId?: number;
 }
 
 export interface IssueListParams extends IssueListFilters {
@@ -37,14 +45,21 @@ export async function listIssues(
   const { data, error } = await client.GET("/issues.{format}", {
     params: {
       path: { format: "json" },
-      query: {
-        offset: params.offset,
-        limit: params.limit,
-        sort: params.sort,
-        project_id: params.projectId ? String(params.projectId) : undefined,
-        assigned_to_id: params.assignee === "me" ? "me" : undefined,
-        status_id: STATUS_QUERY[params.status],
-      },
+      query: params.queryId
+        ? {
+            offset: params.offset,
+            limit: params.limit,
+            sort: params.sort,
+            query_id: params.queryId,
+          }
+        : {
+            offset: params.offset,
+            limit: params.limit,
+            sort: params.sort,
+            project_id: params.projectId ? String(params.projectId) : undefined,
+            assigned_to_id: params.assignee === "me" ? "me" : undefined,
+            status_id: STATUS_QUERY[params.status],
+          },
     },
   });
 

@@ -45,6 +45,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIssues } from "@/hooks/useIssues";
 import { useIssueViews } from "@/hooks/useIssueViews";
 import { useProjects } from "@/hooks/useProjects";
+import { useQueries } from "@/hooks/useQueries";
 import type { IssueListFilters } from "@/api/issues";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import type { IssueView } from "@/lib/issue-views-storage";
@@ -56,6 +57,9 @@ const DEFAULT_FILTERS: Pick<IssueListFilters, "assignee" | "status" | "sort"> =
     status: "open",
     sort: "updated_on:desc",
   };
+
+/** Сентинел для пункта "без query" в Select - Radix Select не допускает value="". */
+const NO_QUERY = "__none__";
 
 const SORTABLE_COLUMNS: { field: string; label: string }[] = [
   { field: "id", label: "ID" },
@@ -90,6 +94,10 @@ export function IssuesPage() {
     DEFAULT_FILTERS.status,
   );
   const [sort, setSort] = useState(DEFAULT_FILTERS.sort);
+  // Нативный Query Redmine (issue #14) - когда выбран, Redmine игнорирует
+  // остальные фильтры на сервере (project/assignee/status), поэтому UI их
+  // дизейблит, а не позволяет думать, что они применяются одновременно.
+  const [queryId, setQueryId] = useState<number | null>(null);
   // Не "view" - это имя уже занято переменной цикла для сохраненных видов (IssueView) ниже.
   const [layout, setLayout] = useState<"table" | "kanban">("table");
 
@@ -98,6 +106,7 @@ export function IssuesPage() {
     assignee,
     status,
     sort,
+    queryId: queryId ?? undefined,
   };
 
   const {
@@ -111,6 +120,7 @@ export function IssuesPage() {
   } = useIssues(client, filters);
   const { views, save, remove } = useIssueViews(baseUrl, user?.id);
   const { projects } = useProjects(client);
+  const { queries } = useQueries(client);
 
   const { field: sortField, dir: sortDir } = parseSort(sort);
 
@@ -123,6 +133,7 @@ export function IssuesPage() {
     setStatus(view.filters.status);
     setSort(view.filters.sort);
     setSelectedProjectId(view.filters.projectId ?? null);
+    setQueryId(view.filters.queryId ?? null);
   }
 
   // Проекты, где у пользователя есть add_issues - и для решения "показывать ли
@@ -160,6 +171,7 @@ export function IssuesPage() {
 
         <Select
           value={assignee}
+          disabled={queryId !== null}
           onValueChange={(v) => setAssignee(v as typeof assignee)}
         >
           <SelectTrigger className="w-40">
@@ -174,6 +186,7 @@ export function IssuesPage() {
         {layout === "table" && (
           <Select
             value={status}
+            disabled={queryId !== null}
             onValueChange={(v) => setStatus(v as typeof status)}
           >
             <SelectTrigger className="w-40">
@@ -183,6 +196,25 @@ export function IssuesPage() {
               <SelectItem value="open">Открытые</SelectItem>
               <SelectItem value="closed">Закрытые</SelectItem>
               <SelectItem value="all">Все статусы</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        {layout === "table" && queries.length > 0 && (
+          <Select
+            value={queryId === null ? NO_QUERY : String(queryId)}
+            onValueChange={(v) => setQueryId(v === NO_QUERY ? null : Number(v))}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_QUERY}>Без Query Redmine</SelectItem>
+              {queries.map((q) => (
+                <SelectItem key={q.id} value={String(q.id)}>
+                  {q.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         )}
@@ -254,6 +286,13 @@ export function IssuesPage() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {layout === "table" && queryId !== null && (
+        <p className="text-sm text-muted-foreground">
+          Применен Query Redmine - фильтры исполнителя, статуса и проекта
+          (в шапке) игнорируются, задаются самим query.
+        </p>
+      )}
 
       {layout === "table" && error && (
         <Alert variant="destructive">
