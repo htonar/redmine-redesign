@@ -1,0 +1,56 @@
+name: CI
+
+# В отличие от desktop-release.yml (только workflow_dispatch, тяжёлая сборка
+# десктоп-дистрибутива по явному решению) - этот workflow лёгкий и гоняется
+# на каждый push в main и на каждый PR: lint/build/test обоих пакетов
+# (фронт + server/), без сборки Tauri-бандлов.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (typecheck + bundle)
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

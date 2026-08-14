@@ -44,6 +44,7 @@ import { useIssues } from "@/hooks/useIssues";
 import { useIssueViews } from "@/hooks/useIssueViews";
 import { useProjects } from "@/hooks/useProjects";
 import type { IssueListFilters } from "@/api/issues";
+import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import type { IssueView } from "@/lib/issue-views-storage";
 import { useLayoutContext } from "./AppLayout";
 
@@ -109,14 +110,10 @@ export function IssuesPage() {
   const { views, save, remove } = useIssueViews(baseUrl, user?.id);
   const { projects } = useProjects(client);
 
-  const [sortField, sortDir] = sort.split(":") as [string, "asc" | "desc"];
+  const { field: sortField, dir: sortDir } = parseSort(sort);
 
   function toggleSort(field: string) {
-    if (field === sortField) {
-      setSort(`${field}:${sortDir === "desc" ? "asc" : "desc"}`);
-    } else {
-      setSort(`${field}:desc`);
-    }
+    setSort(toggleSortValue(sort, field));
   }
 
   function applyView(view: IssueView) {

@@ -35,6 +35,21 @@ export const RELATION_TYPE_INVERSE: Record<IssueRelationType, IssueRelationType>
   copied_from: "copied_to",
 };
 
+/**
+ * Лейбл связи с учётом направления - Redmine хранит relation направленно
+ * (issue_id -> issue_to_id), см. RELATION_TYPE_INVERSE. `isOutgoing` - true,
+ * если текущая задача является issue_id этой связи (т.е. связь была создана
+ * "от" неё), false - если issue_to_id (связь пришла "со стороны" другой задачи).
+ */
+export function describeIssueRelation(
+  type: IssueRelationType,
+  isOutgoing: boolean,
+): string {
+  return isOutgoing
+    ? RELATION_TYPE_LABELS[type]
+    : RELATION_TYPE_LABELS[RELATION_TYPE_INVERSE[type]];
+}
+
 /** Варианты для выпадающего списка при добавлении новой связи. */
 export const RELATION_TYPE_OPTIONS: { value: IssueRelationType; label: string }[] = [
   { value: "relates", label: "Связана с" },
