@@ -224,3 +224,26 @@
     background-color: var(--muted-foreground);
   }
 }
+
+/*
+ * prefers-reduced-motion - общий рубильник для Radix-оверлеев (Dialog,
+ * AlertDialog, DropdownMenu, Select и т.п.), см. issue #9. Все они уже
+ * унифицированы на классах tw-animate-css (animate-in/animate-out,
+ * fade-in-0, zoom-in-95, slide-in-from-*) и помечены data-slot
+ * ("dialog-content", "select-content" и т.д., см. ui/dialog.tsx и
+ * соседние компоненты) - один селектор по суффиксу data-slot бьёт по всем
+ * сразу и автоматически покроет любой будущий Radix-компонент того же
+ * паттерна, без правки каждого файла отдельно.
+ *
+ * 0.01ms вместо animation: none - Radix у части primitives держит
+ * размонтирование/переход состояния на onAnimationEnd; полное отключение
+ * анимации у некоторых версий срывает этот колбэк. Обнуление длительности
+ * даёт тот же визуальный эффект ("анимации нет"), не ломая колбэк.
+ */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot$="-overlay"],
+  [data-slot$="-content"] {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
