@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowDown,
@@ -124,7 +124,14 @@ export function IssuesPage() {
   const setQueryId = (value: number | null) =>
     setPersistedFilters((prev) => ({ ...prev, queryId: value }));
   // Не "view" - это имя уже занято переменной цикла для сохраненных видов (IssueView) ниже.
-  const [layout, setLayout] = useState<"table" | "kanban">("table");
+  // Отдельный персист-ключ, не часть persistedFilters - переключение
+  // канбан/таблица не связано с сохраненными видами (issue #17).
+  const [layout, setLayout] = usePersistedState<"table" | "kanban">(
+    baseUrl,
+    user?.id,
+    "issues-layout",
+    "table",
+  );
 
   const filters: IssueListFilters = {
     projectId: selectedProjectId ?? undefined,

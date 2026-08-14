@@ -62,4 +62,11 @@ describe("savePersistedState / loadPersistedState", () => {
     savePersistedState(BASE_URL, USER_ID, "time-range", "m");
     expect(loadPersistedState(BASE_URL, USER_ID, "time-range", null)).toBe("m");
   });
+
+  it("персистит выбранный вид списка задач (issue #17)", () => {
+    savePersistedState(BASE_URL, USER_ID, "issues-layout", "kanban");
+    expect(loadPersistedState(BASE_URL, USER_ID, "issues-layout", "table")).toBe(
+      "kanban",
+    );
+  });
 });

@@ -1,4 +1,8 @@
-export type PersistedStateKey = "selected-project" | "issues-filters" | "time-range";
+export type PersistedStateKey =
+  | "selected-project"
+  | "issues-filters"
+  | "issues-layout"
+  | "time-range";
 
 /**
  * Персист состояния приложения между перезапусками (issue #6) - выбранный
