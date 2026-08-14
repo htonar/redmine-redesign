@@ -397,7 +397,13 @@ export function IssuesPage() {
                 issues.map((issue) => (
                   <TableRow
                     key={issue.id}
-                    className="cursor-pointer"
+                    // animate-in fade-in-0 - при смене фильтров новые
+                    // issue.id монтируются как новые строки и плавно
+                    // проявляются (issue #9, "переходы между состояниями
+                    // списков при фильтрации"); уже показанные строки не
+                    // перемонтируются на каждый рендер, так что анимация не
+                    // дёргается зря. motion-reduce - см. index.css.
+                    className="cursor-pointer animate-in fade-in-0 duration-200 motion-reduce:animate-none"
                     onClick={() => navigate(`/issues/${issue.id}`)}
                   >
                     <TableCell className="text-muted-foreground">

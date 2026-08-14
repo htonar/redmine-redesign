@@ -57,7 +57,11 @@ function KanbanCard({ issue, draggable, onOpen }: KanbanCardProps) {
         transform ? { transform: CSS.Translate.toString(transform) } : undefined
       }
       className={cn(
-        "flex items-start gap-1.5 rounded-lg border border-border bg-card p-2.5 text-sm shadow-xs transition-[transform,box-shadow] motion-reduce:transition-none",
+        // animate-in fade-in-0 - карточка монтируется заново при
+        // переключении на канбан-вид и при первой загрузке колонки; плавное
+        // появление вместо "прыжка" (issue #9). motion-reduce - см.
+        // index.css / общий паттерн этого файла.
+        "flex items-start gap-1.5 rounded-lg border border-border bg-card p-2.5 text-sm shadow-xs animate-in fade-in-0 duration-200 transition-[transform,box-shadow] motion-reduce:animate-none motion-reduce:transition-none",
         !isDragging &&
           "hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0",
         isDragging && "z-10 opacity-50",
