@@ -9,6 +9,7 @@ import { IssueDetailPage } from "@/pages/IssueDetailPage";
 import { TimeTrackingPage } from "@/pages/TimeTrackingPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { FilesPage } from "@/pages/FilesPage";
+import { ReportsPage } from "@/pages/ReportsPage";
 
 function AppGate() {
   const { status } = useAuth();
@@ -35,6 +36,7 @@ function AppGate() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/files" element={<FilesPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="*" element={<Navigate to="/issues" replace />} />
       </Route>
     </Routes>

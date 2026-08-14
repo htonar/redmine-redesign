@@ -82,6 +82,51 @@ export async function listIssues(
   };
 }
 
+const LIST_ALL_PAGE_LIMIT = 100; // максимум за один запрос в Redmine REST API
+/** Защита от сотен последовательных запросов на аномально большом проекте. */
+const LIST_ALL_MAX_ISSUES = 1000;
+
+export interface ListAllIssuesResult {
+  issues: IssueSummary[];
+  totalCount: number;
+  /** true - показаны не все задачи проекта (уперлись в защитный лимит или сервер отдал меньше totalCount). */
+  isCapped: boolean;
+}
+
+/**
+ * Полная постраничная подгрузка всех задач под фильтр (в отличие от
+ * `listIssues`, который отдает одну страницу) - для мест, которым нужен
+ * точный счет по всем задачам, а не витрина с пагинацией (см. GitHub issue
+ * #13, "Отчёты"). `useKanbanIssues` намеренно берет только одну страницу на
+ * 100 - канбану точный тотал не нужен, отчету нужен.
+ */
+export async function listAllIssues(
+  client: RedmineClient,
+  filters: IssueListFilters,
+): Promise<ListAllIssuesResult> {
+  let issues: IssueSummary[] = [];
+  let totalCount = 0;
+  let offset = 0;
+
+  while (offset < LIST_ALL_MAX_ISSUES) {
+    const page = await listIssues(client, {
+      ...filters,
+      offset,
+      limit: LIST_ALL_PAGE_LIMIT,
+    });
+    totalCount = page.totalCount;
+    issues = issues.concat(page.issues);
+    offset += LIST_ALL_PAGE_LIMIT;
+
+    // Пустая страница раньше totalCount - сервер противоречит сам себе,
+    // обрываем цикл вместо бесконечных запросов по нулю новых issues.
+    if (page.issues.length === 0) break;
+    if (offset >= totalCount) break;
+  }
+
+  return { issues, totalCount, isCapped: issues.length < totalCount };
+}
+
 /** Карточка задачи - все поля + история изменений, подзадачи, связи и доступные для текущего пользователя переходы статуса. */
 export async function getIssue(
   client: RedmineClient,

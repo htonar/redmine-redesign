@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { listIssues, type IssueListParams, type IssueSummary } from "@/api/issues";
+import {
+  listAllIssues,
+  listIssues,
+  type IssueListFilters,
+  type IssueListParams,
+  type IssueSummary,
+} from "@/api/issues";
 import type { RedmineClient } from "@/api/client";
 
 function mockClient(GET: ReturnType<typeof vi.fn>): RedmineClient {
@@ -12,6 +18,13 @@ const baseParams: IssueListParams = {
   sort: "updated_on:desc",
   offset: 0,
   limit: 25,
+};
+
+const baseFilters: IssueListFilters = {
+  projectId: 1,
+  assignee: "all",
+  status: "all",
+  sort: "id",
 };
 
 describe("listIssues", () => {
@@ -125,5 +138,55 @@ describe("listIssues", () => {
     const GET2 = vi.fn().mockResolvedValue({ data: { issues: [] } });
     await listIssues(mockClient(GET2), baseParams);
     expect(GET2.mock.calls[0][1].params.query.watcher_id).toBeUndefined();
+  });
+});
+
+function fakeIssues(count: number): IssueSummary[] {
+  return Array.from({ length: count }, (_, i) => ({ id: i })) as IssueSummary[];
+}
+
+describe("listAllIssues", () => {
+  it("totalCount помещается на одну страницу -> один запрос", async () => {
+    const GET = vi.fn().mockResolvedValue({
+      data: { issues: fakeIssues(2), total_count: 2 },
+    });
+    const result = await listAllIssues(mockClient(GET), baseFilters);
+    expect(GET).toHaveBeenCalledTimes(1);
+    expect(result.issues).toHaveLength(2);
+    expect(result.totalCount).toBe(2);
+    expect(result.isCapped).toBe(false);
+  });
+
+  it("несколько страниц -> конкатенирует issues по всем вызовам", async () => {
+    const GET = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { issues: fakeIssues(100), total_count: 150 } })
+      .mockResolvedValueOnce({ data: { issues: fakeIssues(50), total_count: 150 } });
+    const result = await listAllIssues(mockClient(GET), baseFilters);
+    expect(GET).toHaveBeenCalledTimes(2);
+    expect(result.issues).toHaveLength(150);
+    expect(result.totalCount).toBe(150);
+    expect(result.isCapped).toBe(false);
+    expect(GET.mock.calls[1][1].params.query.offset).toBe(100);
+  });
+
+  it("аномально большой totalCount -> останавливается на защитном лимите, isCapped: true", async () => {
+    const GET = vi.fn().mockResolvedValue({
+      data: { issues: fakeIssues(100), total_count: 5000 },
+    });
+    const result = await listAllIssues(mockClient(GET), baseFilters);
+    expect(result.issues.length).toBeLessThanOrEqual(1000);
+    expect(result.isCapped).toBe(true);
+    // Цикл действительно остановился, а не завис - конечное число запросов.
+    expect(GET.mock.calls.length).toBeLessThanOrEqual(10);
+  });
+
+  it("сервер вернул пустую страницу раньше totalCount -> цикл обрывается, а не зависает", async () => {
+    const GET = vi.fn().mockResolvedValue({
+      data: { issues: [], total_count: 50 },
+    });
+    const result = await listAllIssues(mockClient(GET), baseFilters);
+    expect(GET).toHaveBeenCalledTimes(1);
+    expect(result.issues).toHaveLength(0);
   });
 });

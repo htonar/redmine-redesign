@@ -1,4 +1,4 @@
-import { BarChart3, Clock, Folder, PencilLine, User, type LucideIcon } from 'lucide-react'
+import { BarChart3, Clock, Folder, PencilLine, PieChart, User, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   id: string
@@ -10,10 +10,10 @@ export interface NavItem {
 
 /**
  * Пункты левого сайдбара - см. docs/design.md, раздел "Компоненты, встреченные
- * в макетах". "Сообщения", "Отчеты" и "Цели" из референса сюда сознательно не
- * входят - решили вырезать их до появления ясности, что каждый из них значит
- * в нашем случае (см. CLAUDE.md, "Бэклог: пустые пункты сайдбара/топбара" -
- * там же зафиксировано, почему именно эти три отложены, а не Файлы/Профиль).
+ * в макетах". "Сообщения" и "Цели" из референса сюда сознательно не входят -
+ * решили вырезать их до появления ясности, что каждый из них значит в нашем
+ * случае (см. CLAUDE.md, "Бэклог: пустые пункты сайдбара/топбара"). "Отчеты"
+ * реализованы (GitHub issue #13) - сводка по задачам выбранного проекта.
  */
 export const navItems: NavItem[] = [
   { id: 'profile', label: 'Профиль', icon: User, path: '/profile' },
@@ -21,4 +21,5 @@ export const navItems: NavItem[] = [
   { id: 'activity', label: 'Активность', icon: BarChart3, path: '/dashboard' },
   { id: 'tasks', label: 'Задачи', icon: PencilLine, path: '/issues' },
   { id: 'files', label: 'Файлы', icon: Folder, path: '/files' },
+  { id: 'reports', label: 'Отчеты', icon: PieChart, path: '/reports' },
 ]
