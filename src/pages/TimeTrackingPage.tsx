@@ -24,6 +24,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LogTimeDialog, type LogTimeDialogInitial } from "@/components/time/LogTimeDialog";
 import { WeeklyTimeDebtWidget } from "@/components/time/WeeklyTimeDebtWidget";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
@@ -99,12 +100,17 @@ function editInitial(entry: TimeEntry): LogTimeDialogInitial {
  * Правка/удаление своей записи - через PUT/DELETE, доступны прямо из таблицы.
  */
 export function TimeTrackingPage() {
-  const { client } = useAuth();
+  const { client, baseUrl, user } = useAuth();
   const { selectedProjectId } = useLayoutContext();
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
   const [scope, setScope] = useState<TimeEntryListFilters["scope"]>("me");
-  const [range, setRange] = useState<RangeValue>("w");
+  const [range, setRange] = usePersistedState<RangeValue>(
+    baseUrl,
+    user?.id,
+    "time-range",
+    "w",
+  );
   const [deleteTarget, setDeleteTarget] = useState<TimeEntry | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 

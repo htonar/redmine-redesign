@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useProjects } from "@/hooks/useProjects";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 interface LayoutContext {
   selectedProjectId: number | null;
@@ -25,7 +26,10 @@ export function AppLayout() {
   const { user, client, baseUrl, can, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { projects, isLoading: projectsLoading } = useProjects(client);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
+  const [selectedProjectId, setSelectedProjectId] = usePersistedState<number | null>(
+    baseUrl,
+    user?.id,
+    "selected-project",
     null,
   );
   const navigate = useNavigate();

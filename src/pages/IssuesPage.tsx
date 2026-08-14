@@ -44,6 +44,7 @@ import { KanbanBoard } from "@/components/issues/KanbanBoard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssues } from "@/hooks/useIssues";
 import { useIssueViews } from "@/hooks/useIssueViews";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { useProjects } from "@/hooks/useProjects";
 import { useQueries } from "@/hooks/useQueries";
 import type { IssueListFilters } from "@/api/issues";
@@ -57,6 +58,23 @@ const DEFAULT_FILTERS: Pick<IssueListFilters, "assignee" | "status" | "sort"> =
     status: "open",
     sort: "updated_on:desc",
   };
+
+/**
+ * Персистится одним объектом (issue #6) - "что было открыто в последний раз",
+ * не путать с сохраненными видами (useIssueViews - именованные, создаются
+ * вручную). queryId включен сюда же - тоже часть "текущего вида" списка.
+ */
+interface PersistedIssueFilters {
+  assignee: IssueListFilters["assignee"];
+  status: IssueListFilters["status"];
+  sort: string;
+  queryId: number | null;
+}
+
+const DEFAULT_PERSISTED_FILTERS: PersistedIssueFilters = {
+  ...DEFAULT_FILTERS,
+  queryId: null,
+};
 
 /** Сентинел для пункта "без query" в Select - Radix Select не допускает value="". */
 const NO_QUERY = "__none__";
@@ -87,17 +105,24 @@ export function IssuesPage() {
   const navigate = useNavigate();
   const { client, baseUrl, user, can } = useAuth();
   const { selectedProjectId, setSelectedProjectId } = useLayoutContext();
-  const [assignee, setAssignee] = useState<IssueListFilters["assignee"]>(
-    DEFAULT_FILTERS.assignee,
+  const [persistedFilters, setPersistedFilters] = usePersistedState<PersistedIssueFilters>(
+    baseUrl,
+    user?.id,
+    "issues-filters",
+    DEFAULT_PERSISTED_FILTERS,
   );
-  const [status, setStatus] = useState<IssueListFilters["status"]>(
-    DEFAULT_FILTERS.status,
-  );
-  const [sort, setSort] = useState(DEFAULT_FILTERS.sort);
+  const { assignee, status, sort, queryId } = persistedFilters;
+  const setAssignee = (value: IssueListFilters["assignee"]) =>
+    setPersistedFilters((prev) => ({ ...prev, assignee: value }));
+  const setStatus = (value: IssueListFilters["status"]) =>
+    setPersistedFilters((prev) => ({ ...prev, status: value }));
+  const setSort = (value: string) =>
+    setPersistedFilters((prev) => ({ ...prev, sort: value }));
   // Нативный Query Redmine (issue #14) - когда выбран, Redmine игнорирует
   // остальные фильтры на сервере (project/assignee/status), поэтому UI их
   // дизейблит, а не позволяет думать, что они применяются одновременно.
-  const [queryId, setQueryId] = useState<number | null>(null);
+  const setQueryId = (value: number | null) =>
+    setPersistedFilters((prev) => ({ ...prev, queryId: value }));
   // Не "view" - это имя уже занято переменной цикла для сохраненных видов (IssueView) ниже.
   const [layout, setLayout] = useState<"table" | "kanban">("table");
 
