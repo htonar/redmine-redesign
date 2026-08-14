@@ -966,17 +966,21 @@ export function IssueDetailPage() {
                       #{issue.parent.id} —{" "}
                       {relatedSummaries[issue.parent.id]?.subject ?? "..."}
                     </Link>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
-                      onClick={handleClearParent}
-                      disabled={isSavingParent}
-                      aria-label="Убрать родительскую задачу"
-                    >
-                      <X className="size-3.5" />
-                    </Button>
+                    {can("edit_issues", projectId) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                        onClick={handleClearParent}
+                        disabled={isSavingParent}
+                        aria-label="Убрать родительскую задачу"
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    )}
                   </div>
+                ) : !can("edit_issues", projectId) ? (
+                  <EmptyState size="compact" title="Нет" />
                 ) : isEditingParent ? (
                   <div className="flex items-center gap-2">
                     <IssuePicker
@@ -1042,50 +1046,56 @@ export function IssueDetailPage() {
                         >
                           #{c.id} — {c.subject ?? "—"}
                         </Link>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
-                          onClick={() =>
-                            c.id != null && handleRemoveChild(c.id)
-                          }
-                          disabled={c.id == null || removingChildId === c.id}
-                          aria-label="Отвязать подзадачу"
-                        >
-                          {removingChildId === c.id ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <X className="size-3.5" />
-                          )}
-                        </Button>
+                        {can("edit_issues", projectId) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                            onClick={() =>
+                              c.id != null && handleRemoveChild(c.id)
+                            }
+                            disabled={
+                              c.id == null || removingChildId === c.id
+                            }
+                            aria-label="Отвязать подзадачу"
+                          >
+                            {removingChildId === c.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <X className="size-3.5" />
+                            )}
+                          </Button>
+                        )}
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <EmptyState size="compact" title="Нет" />
                 )}
-                <div className="mt-2 flex items-center gap-2">
-                  <IssuePicker
-                    client={client}
-                    value={childInput}
-                    onChange={setChildInput}
-                    projectId={projectId}
-                    className="w-56"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={handleAddChild}
-                    disabled={isAddingChild}
-                  >
-                    {isAddingChild && (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    )}
-                    <Plus className="size-3.5" />
-                    Добавить подзадачу
-                  </Button>
-                </div>
+                {can("edit_issues", projectId) && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <IssuePicker
+                      client={client}
+                      value={childInput}
+                      onChange={setChildInput}
+                      projectId={projectId}
+                      className="w-56"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={handleAddChild}
+                      disabled={isAddingChild}
+                    >
+                      {isAddingChild && (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      )}
+                      <Plus className="size-3.5" />
+                      Добавить подзадачу
+                    </Button>
+                  </div>
+                )}
                 {childError && (
                   <p className="mt-1 text-xs text-destructive">{childError}</p>
                 )}
@@ -1124,24 +1134,26 @@ export function IssueDetailPage() {
                               "—"
                             )}
                           </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
-                            onClick={() =>
-                              r.id != null && handleRemoveRelation(r.id)
-                            }
-                            disabled={
-                              r.id == null || removingRelationId === r.id
-                            }
-                            aria-label="Удалить связь"
-                          >
-                            {removingRelationId === r.id ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <X className="size-3.5" />
-                            )}
-                          </Button>
+                          {can("manage_issue_relations", projectId) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                              onClick={() =>
+                                r.id != null && handleRemoveRelation(r.id)
+                              }
+                              disabled={
+                                r.id == null || removingRelationId === r.id
+                              }
+                              aria-label="Удалить связь"
+                            >
+                              {removingRelationId === r.id ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <X className="size-3.5" />
+                              )}
+                            </Button>
+                          )}
                         </li>
                       );
                     })}
@@ -1149,45 +1161,47 @@ export function IssueDetailPage() {
                 ) : (
                   <EmptyState size="compact" title="Нет" />
                 )}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Select
-                    value={relationType}
-                    onValueChange={(v) =>
-                      setRelationType(v as IssueRelationType)
-                    }
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RELATION_TYPE_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <IssuePicker
-                    client={client}
-                    value={relationInput}
-                    onChange={setRelationInput}
-                    projectId={projectId}
-                    className="w-56"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={handleAddRelation}
-                    disabled={isAddingRelation}
-                  >
-                    {isAddingRelation && (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    )}
-                    <Plus className="size-3.5" />
-                    Добавить связь
-                  </Button>
-                </div>
+                {can("manage_issue_relations", projectId) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Select
+                      value={relationType}
+                      onValueChange={(v) =>
+                        setRelationType(v as IssueRelationType)
+                      }
+                    >
+                      <SelectTrigger className="w-44">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RELATION_TYPE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <IssuePicker
+                      client={client}
+                      value={relationInput}
+                      onChange={setRelationInput}
+                      projectId={projectId}
+                      className="w-56"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={handleAddRelation}
+                      disabled={isAddingRelation}
+                    >
+                      {isAddingRelation && (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      )}
+                      <Plus className="size-3.5" />
+                      Добавить связь
+                    </Button>
+                  </div>
+                )}
                 {relationError && (
                   <p className="mt-1 text-xs text-destructive">
                     {relationError}
@@ -1220,53 +1234,58 @@ export function IssueDetailPage() {
                           ({formatFileSize(a.filesize)})
                         </span>
                       </button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveAttachment(a.id)}
-                        disabled={removingAttachmentId === a.id}
-                        aria-label="Удалить файл"
-                      >
-                        {removingAttachmentId === a.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <X className="size-3.5" />
-                        )}
-                      </Button>
+                      {can("edit_issues", projectId) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveAttachment(a.id)}
+                          disabled={removingAttachmentId === a.id}
+                          aria-label="Удалить файл"
+                        >
+                          {removingAttachmentId === a.id ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <X className="size-3.5" />
+                          )}
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <EmptyState size="compact" title="Нет" />
               )}
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={handleFileInputChange}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingFile}
-                >
-                  {isUploadingFile ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Plus className="size-3.5" />
+              {(can("edit_issues", projectId) ||
+                can("add_issue_notes", projectId)) && (
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileInputChange}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingFile}
+                  >
+                    {isUploadingFile ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="size-3.5" />
+                    )}
+                    Прикрепить файл
+                  </Button>
+                  {attachmentError && (
+                    <p className="mt-1 text-xs text-destructive">
+                      {attachmentError}
+                    </p>
                   )}
-                  Прикрепить файл
-                </Button>
-                {attachmentError && (
-                  <p className="mt-1 text-xs text-destructive">
-                    {attachmentError}
-                  </p>
-                )}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1306,57 +1325,62 @@ export function IssueDetailPage() {
                       className="flex items-center justify-between gap-2"
                     >
                       <span className="text-sm">{w.name}</span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveWatcher(w.id)}
-                        disabled={removingWatcherId === w.id}
-                        aria-label="Убрать наблюдателя"
-                      >
-                        {removingWatcherId === w.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <X className="size-3.5" />
-                        )}
-                      </Button>
+                      {(w.id === user?.id ||
+                        can("delete_issue_watchers", projectId)) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveWatcher(w.id)}
+                          disabled={removingWatcherId === w.id}
+                          aria-label="Убрать наблюдателя"
+                        >
+                          {removingWatcherId === w.id ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <X className="size-3.5" />
+                          )}
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <EmptyState size="compact" title="Нет" />
               )}
-              <div className="flex flex-wrap items-center gap-2">
-                <Select value={watcherInput} onValueChange={setWatcherInput}>
-                  <SelectTrigger className="w-56">
-                    <SelectValue placeholder="Участник проекта" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members
-                      .filter(
-                        (m) => !issue.watchers?.some((w) => w.id === m.id),
-                      )
-                      .map((m) => (
-                        <SelectItem key={m.id} value={String(m.id)}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => handleAddWatcher(Number(watcherInput))}
-                  disabled={!watcherInput || isAddingWatcher}
-                >
-                  {isAddingWatcher && (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  )}
-                  <Plus className="size-3.5" />
-                  Добавить наблюдателя
-                </Button>
-              </div>
+              {can("add_issue_watchers", projectId) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={watcherInput} onValueChange={setWatcherInput}>
+                    <SelectTrigger className="w-56">
+                      <SelectValue placeholder="Участник проекта" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {members
+                        .filter(
+                          (m) => !issue.watchers?.some((w) => w.id === m.id),
+                        )
+                        .map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => handleAddWatcher(Number(watcherInput))}
+                    disabled={!watcherInput || isAddingWatcher}
+                  >
+                    {isAddingWatcher && (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    )}
+                    <Plus className="size-3.5" />
+                    Добавить наблюдателя
+                  </Button>
+                </div>
+              )}
               {watcherError && (
                 <p className="text-xs text-destructive">{watcherError}</p>
               )}
@@ -1366,6 +1390,7 @@ export function IssueDetailPage() {
           <Card>
             <CardHeader className="flex items-center justify-between border-b">
               <CardTitle>Время</CardTitle>
+              {can("log_time", projectId) && (
               <LogTimeDialog
                 client={client}
                 projects={projects}
@@ -1380,6 +1405,7 @@ export function IssueDetailPage() {
                   </Button>
                 }
               />
+              )}
             </CardHeader>
             <CardContent>
               <span className="text-sm text-muted-foreground">
@@ -1414,30 +1440,32 @@ export function IssueDetailPage() {
                 )}
               </div>
 
-              <div className="flex flex-col gap-2 border-t border-border pt-3">
-                <MarkdownEditor
-                  client={client}
-                  placeholder="Добавить комментарий..."
-                  value={comment}
-                  onChange={setComment}
-                  onUpload={(f) =>
-                    setPendingCommentUploads((prev) => [...prev, f])
-                  }
-                  onSubmitShortcut={handleAddComment}
-                  rows={3}
-                />
-                <Button
-                  size="sm"
-                  className="w-fit"
-                  disabled={!comment.trim() || isSavingComment}
-                  onClick={handleAddComment}
-                >
-                  {isSavingComment && (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  )}
-                  Добавить
-                </Button>
-              </div>
+              {can("add_issue_notes", projectId) && (
+                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                  <MarkdownEditor
+                    client={client}
+                    placeholder="Добавить комментарий..."
+                    value={comment}
+                    onChange={setComment}
+                    onUpload={(f) =>
+                      setPendingCommentUploads((prev) => [...prev, f])
+                    }
+                    onSubmitShortcut={handleAddComment}
+                    rows={3}
+                  />
+                  <Button
+                    size="sm"
+                    className="w-fit"
+                    disabled={!comment.trim() || isSavingComment}
+                    onClick={handleAddComment}
+                  >
+                    {isSavingComment && (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    )}
+                    Добавить
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>

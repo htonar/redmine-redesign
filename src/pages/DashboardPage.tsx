@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,7 @@ interface Counts {
  */
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { client } = useAuth();
+  const { client, can } = useAuth();
   const { selectedProjectId } = useLayoutContext();
   const [counts, setCounts] = useState<Counts | null>(null);
   const [recent, setRecent] = useState<IssueSummary[]>([]);
@@ -55,6 +55,12 @@ export function DashboardPage() {
   const activity = useActivityFeed(client, selectedProjectId ?? undefined);
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
+  // log_time - право за проект, виджету передаем уже отфильтрованный список
+  // (см. TimeTrackingPage.tsx - тот же паттерн).
+  const loggableProjects = useMemo(
+    () => projects.filter((p) => can("log_time", p.id)),
+    [projects, can],
+  );
 
   async function handleLogTime(input: TimeEntryInput) {
     if (!client) return;
@@ -127,7 +133,7 @@ export function DashboardPage() {
     <div className="flex flex-col gap-4">
       <WeeklyTimeDebtWidget
         client={client}
-        projects={projects}
+        projects={loggableProjects}
         activities={activities}
         defaultProjectId={selectedProjectId}
         onLogTime={handleLogTime}

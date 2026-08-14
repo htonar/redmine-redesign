@@ -70,10 +70,27 @@ admin?                                  -> да, можно всё
 внедрения проверок в UI нужно оставлять обработку 403 от API как fallback
 (на случай гонки: права отозвали между загрузкой страницы и кликом).
 
-## Следующий шаг (не сделан в этой сессии)
+## Реализация
 
-Реализация: добавить в `AuthContext` (или отдельный хук `usePermissions`)
-загрузку `memberships` + кэш `rolePermissions`, и функцию вида
-`can(permission, projectId)`. Использовать в `IssueDetailPage` для кнопки
-"Удалить" (сейчас не реализована вообще - см. CLAUDE.md) и для скрытия
-"Редактировать"/"Добавить задачу" там, где прав нет.
+`AuthContext.can(permission, projectId)` - готово, кэш `rolePermissions` на
+сессию. Применено (issue #12, полный список мест - см. историю коммитов):
+
+- `edit_issues`/`delete_issues`/`add_issues`/`manage_files` - исходный набор.
+- `add_issue_notes` - поле комментария на карточке задачи.
+- `manage_issue_relations` - добавление/удаление связей между задачами.
+- `edit_issues` (повторно) - привязка/отвязка родителя и подзадач (это PUT
+  `parent_issue_id`, тот же контракт, что у формы редактирования).
+- `add_issue_watchers`/`delete_issue_watchers` - добавление стороннего
+  наблюдателя и снятие **чужого** наблюдателя; снятие **себя** правом не
+  ограничено (Redmine разрешает self-watch/unwatch всем, кто видит задачу).
+- `log_time` - право за проект, а не за страницу (диалог логирования сам
+  содержит выбор проекта) - фильтруется список проектов, передаваемых в
+  `LogTimeDialog`, тем же паттерном, что `add_issues` в `IssuesPage.tsx`.
+- `edit_time_entries`/`edit_own_time_entries` - правка/удаление существующей
+  записи трудозатрат (в Redmine оба действия проверяются одним правом, нет
+  отдельного `delete_time_entries`) - вынесено в чистую функцию
+  `canManageTimeEntry` (`src/lib/time-entry-permissions.ts`, с тестами).
+- Вложения к задаче: загрузка - `edit_issues || add_issue_notes`, удаление -
+  `edit_issues` (подтверждено по исходникам Redmine:
+  `Issue#attachments_deletable?` - это `editable_by?`, без исключения для
+  автора загрузки).

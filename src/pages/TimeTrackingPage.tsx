@@ -36,6 +36,7 @@ import {
   type TimeEntryInput,
   type TimeEntryListFilters,
 } from "@/api/timeEntries";
+import { canManageTimeEntry } from "@/lib/time-entry-permissions";
 import { useLayoutContext } from "./AppLayout";
 
 type RangeValue = NonNullable<TimeEntryListFilters["spentOn"]> | "all";
@@ -100,10 +101,17 @@ function editInitial(entry: TimeEntry): LogTimeDialogInitial {
  * Правка/удаление своей записи - через PUT/DELETE, доступны прямо из таблицы.
  */
 export function TimeTrackingPage() {
-  const { client, baseUrl, user } = useAuth();
+  const { client, baseUrl, user, can } = useAuth();
   const { selectedProjectId } = useLayoutContext();
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
+  // log_time - право за проект, а не за страницу; LogTimeDialog сам содержит
+  // выбор проекта, поэтому фильтруем список проектов, а не одну кнопку - см.
+  // тот же паттерн для add_issues в IssuesPage.tsx/AppLayout.tsx.
+  const loggableProjects = useMemo(
+    () => projects.filter((p) => can("log_time", p.id)),
+    [projects, can],
+  );
   const [scope, setScope] = useState<TimeEntryListFilters["scope"]>("me");
   const [range, setRange] = usePersistedState<RangeValue>(
     baseUrl,
@@ -154,7 +162,7 @@ export function TimeTrackingPage() {
     <div className="flex flex-col gap-4">
       <WeeklyTimeDebtWidget
         client={client}
-        projects={projects}
+        projects={loggableProjects}
         activities={activities}
         defaultProjectId={selectedProjectId}
         onLogTime={handleCreate}
@@ -186,19 +194,21 @@ export function TimeTrackingPage() {
           </Select>
         </div>
 
-        <LogTimeDialog
-          client={client}
-          projects={projects}
-          activities={activities}
-          defaultProjectId={selectedProjectId}
-          onSubmit={handleCreate}
-          trigger={
-            <Button size="sm" className="gap-1.5">
-              <Plus className="size-3.5" />
-              Залогировать время
-            </Button>
-          }
-        />
+        {loggableProjects.length > 0 && (
+          <LogTimeDialog
+            client={client}
+            projects={loggableProjects}
+            activities={activities}
+            defaultProjectId={selectedProjectId}
+            onSubmit={handleCreate}
+            trigger={
+              <Button size="sm" className="gap-1.5">
+                <Plus className="size-3.5" />
+                Залогировать время
+              </Button>
+            }
+          />
+        )}
       </div>
 
       {error && (
@@ -281,26 +291,30 @@ export function TimeTrackingPage() {
                       <TableCell className="text-right">{entry.hours.toFixed(2)}</TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
-                          <LogTimeDialog
-                            client={client}
-                            projects={projects}
-                            activities={activities}
-                            initial={editInitial(entry)}
-                            onSubmit={(input) => handleUpdate(entry.id, input)}
-                            trigger={
-                              <Button variant="ghost" size="icon-sm" aria-label="Изменить запись">
-                                <Pencil className="size-3.5" />
+                          {canManageTimeEntry(entry, user?.id, can) && (
+                            <>
+                              <LogTimeDialog
+                                client={client}
+                                projects={loggableProjects}
+                                activities={activities}
+                                initial={editInitial(entry)}
+                                onSubmit={(input) => handleUpdate(entry.id, input)}
+                                trigger={
+                                  <Button variant="ghost" size="icon-sm" aria-label="Изменить запись">
+                                    <Pencil className="size-3.5" />
+                                  </Button>
+                                }
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Удалить запись"
+                                onClick={() => setDeleteTarget(entry)}
+                              >
+                                <Trash2 className="size-3.5" />
                               </Button>
-                            }
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Удалить запись"
-                            onClick={() => setDeleteTarget(entry)}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

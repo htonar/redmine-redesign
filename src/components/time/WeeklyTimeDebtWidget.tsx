@@ -68,7 +68,7 @@ function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime
         {day.isFuture ? "—" : `${day.hoursLogged.toFixed(1)}ч`}
       </div>
 
-      {!day.isFuture && day.deficit > 0 && (
+      {!day.isFuture && day.deficit > 0 && projects.length > 0 && (
         <LogTimeDialog
           client={client}
           projects={projects}
@@ -94,6 +94,12 @@ function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime
 
 export interface WeeklyTimeDebtWidgetProps {
   client: RedmineClient | null;
+  /**
+   * Ожидается уже отфильтрованным по праву log_time (см. вызывающий код в
+   * TimeTrackingPage.tsx/DashboardPage.tsx) - виджет сам прав не проверяет,
+   * пустой список значит "нигде залогировать время нельзя", кнопка "+"
+   * скрывается.
+   */
   projects: Project[];
   activities: TimeEntryActivity[];
   defaultProjectId?: number | null;
