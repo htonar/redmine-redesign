@@ -1,4 +1,10 @@
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +42,8 @@ export interface LogTimeDialogInitial {
 }
 
 export interface LogTimeDialogProps {
-  trigger: ReactNode;
+  /** Без trigger диалог управляется только снаружи через open/onOpenChange (см. вызов из трея в AppLayout.tsx). */
+  trigger?: ReactNode;
   client: RedmineClient | null;
   projects: Project[];
   activities: TimeEntryActivity[];
@@ -49,6 +56,9 @@ export interface LogTimeDialogProps {
   /** Если задано - форма открывается в режиме правки существующей записи. */
   initial?: LogTimeDialogInitial;
   onSubmit: (input: TimeEntryInput) => Promise<void>;
+  /** Управляемое состояние открытия - если не передано, диалог сам открывается по клику на trigger. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 function todayIsoDate(): string {
@@ -77,9 +87,13 @@ export function LogTimeDialog({
   defaultSpentOn,
   initial,
   onSubmit,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
 }: LogTimeDialogProps) {
   const isEditing = Boolean(initial);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = setControlledOpen ?? setInternalOpen;
   const [issueId, setIssueId] = useState<number | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [spentOn, setSpentOn] = useState(todayIsoDate());
@@ -106,8 +120,17 @@ export function LogTimeDialog({
     setFormError(null);
   }
 
+  // Сброс формы при открытии - в эффекте, а не в handleOpenChange, потому
+  // что при управляемом open (тревей-вызов "Залогировать время" в
+  // AppLayout.tsx) Radix не зовет onOpenChange для переходов, инициированных
+  // снаружи (см. тот же приём в CreateIssueDialog.tsx).
+  useEffect(() => {
+    if (!open) return;
+    resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   function handleOpenChange(next: boolean) {
-    if (next) resetForm();
     setOpen(next);
   }
 
@@ -148,7 +171,7 @@ export function LogTimeDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
