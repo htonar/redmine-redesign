@@ -18,6 +18,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LogTimeDialog, type LogTimeDialogInitial } from "@/components/time/LogTimeDialog";
 import { WeeklyTimeDebtWidget } from "@/components/time/WeeklyTimeDebtWidget";
@@ -212,16 +214,26 @@ export function TimeTrackingPage() {
         </Card>
       )}
 
-      {isLoading && (
-        <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Загрузка...
-        </div>
-      )}
+      {isLoading &&
+        Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="flex items-center justify-between border-b">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-12" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 px-4 py-3">
+              <Skeleton className="h-5 w-full" />
+              <Skeleton className="h-5 w-full" />
+            </CardContent>
+          </Card>
+        ))}
 
       {!isLoading && entries.length === 0 && !error && (
-        <div className="rounded-lg border border-border bg-card py-8 text-center text-muted-foreground">
-          Записей по этим фильтрам не найдено
+        <div className="rounded-lg border border-border bg-card">
+          <EmptyState
+            size="default"
+            title="Записей по этим фильтрам не найдено"
+          />
         </div>
       )}
 

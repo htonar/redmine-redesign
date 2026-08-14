@@ -12,9 +12,11 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Loader2 } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 import { celebrate } from "@/lib/celebrate";
 import { useIssueStatuses } from "@/hooks/useIssueStatuses";
@@ -282,9 +284,18 @@ export function KanbanBoard({
 
   if (statusesLoading || isLoading) {
     return (
-      <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Загрузка...
+      <div className="flex h-[70vh] gap-3 overflow-x-auto pb-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2"
+          >
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ))}
       </div>
     );
   }
@@ -342,8 +353,8 @@ export function KanbanBoard({
         </p>
       )}
       {!hasMore && issues.length === 0 && (
-        <div className="rounded-lg border border-border bg-card py-8 text-center text-muted-foreground">
-          Задач по этим фильтрам не найдено
+        <div className="rounded-lg border border-border bg-card">
+          <EmptyState size="default" title="Задач по этим фильтрам не найдено" />
         </div>
       )}
     </div>

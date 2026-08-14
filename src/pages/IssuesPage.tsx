@@ -36,6 +36,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { SaveViewDialog } from "@/components/issues/SaveViewDialog";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
 import { KanbanBoard } from "@/components/issues/KanbanBoard";
@@ -303,20 +305,19 @@ export function IssuesPage() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell
-                      colSpan={8}
-                      className="h-10 animate-pulse bg-muted/50"
-                    />
+                    <TableCell colSpan={8}>
+                      <Skeleton className="h-5 w-full" />
+                    </TableCell>
                   </TableRow>
                 ))}
 
               {!isLoading && issues.length === 0 && !error && (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="py-8 text-center text-muted-foreground"
-                  >
-                    Задач по этим фильтрам не найдено
+                  <TableCell colSpan={7}>
+                    <EmptyState
+                      size="default"
+                      title="Задач по этим фильтрам не найдено"
+                    />
                   </TableCell>
                 </TableRow>
               )}

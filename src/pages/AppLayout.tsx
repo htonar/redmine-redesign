@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Outlet, useNavigate, useOutletContext } from "react-router";
+import { Outlet, useLocation, useNavigate, useOutletContext } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
 import { HotkeysHelpDialog } from "@/components/layout/HotkeysHelpDialog";
 import { UpdateBanner } from "@/components/layout/UpdateBanner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useProjects } from "@/hooks/useProjects";
@@ -28,6 +29,7 @@ export function AppLayout() {
     null,
   );
   const navigate = useNavigate();
+  const location = useLocation();
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
   const [isHotkeysHelpOpen, setIsHotkeysHelpOpen] = useState(false);
 
@@ -73,11 +75,18 @@ export function AppLayout() {
         onToggleTheme={toggleTheme}
         onShowHotkeysHelp={() => setIsHotkeysHelpOpen(true)}
       >
-        <Outlet
-          context={
-            { selectedProjectId, setSelectedProjectId } satisfies LayoutContext
-          }
-        />
+        {/* key на путь - при переходе на другую страницу пойманная ошибка
+            не "залипает" на исправно работающем разделе. */}
+        <ErrorBoundary
+          key={location.pathname}
+          title="Не удалось отобразить раздел"
+        >
+          <Outlet
+            context={
+              { selectedProjectId, setSelectedProjectId } satisfies LayoutContext
+            }
+          />
+        </ErrorBoundary>
       </AppShell>
       {/* Глобальный диалог создания задачи для хоткея "c" - без trigger, только open/onOpenChange. */}
       <CreateIssueDialog

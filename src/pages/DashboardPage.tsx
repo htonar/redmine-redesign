@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { Loader2 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +12,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuth } from "@/contexts/AuthContext";
 import { listIssues, type IssueSummary } from "@/api/issues";
 import { createTimeEntry, type TimeEntryInput } from "@/api/timeEntries";
@@ -101,9 +103,22 @@ export function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Загрузка...
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Недавно обновленные мои задачи</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 px-4 py-4">
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -139,9 +154,7 @@ export function DashboardPage() {
         </CardHeader>
         <CardContent className="px-0">
           {recent.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-muted-foreground">
-              Открытых задач на вас не найдено
-            </p>
+            <EmptyState title="Открытых задач на вас не найдено" />
           ) : (
             <Table>
               <TableHeader>
@@ -191,12 +204,15 @@ export function DashboardPage() {
               <AlertDescription>{activity.error}</AlertDescription>
             </Alert>
           ) : activity.isLoading ? (
-            <div className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Загрузка...
+            <div className="flex flex-col gap-2 px-4 py-4">
+              <Skeleton className="h-5 w-full" />
+              <Skeleton className="h-5 w-full" />
+              <Skeleton className="h-5 w-3/4" />
             </div>
           ) : (
-            <ActivityFeed entries={activity.entries} />
+            <ErrorBoundary title="Не удалось отобразить ленту активности">
+              <ActivityFeed entries={activity.entries} />
+            </ErrorBoundary>
           )}
         </CardContent>
       </Card>

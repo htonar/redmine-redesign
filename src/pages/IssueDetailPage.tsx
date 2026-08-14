@@ -30,6 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LogTimeDialog } from "@/components/time/LogTimeDialog";
 import {
@@ -705,9 +707,46 @@ export function IssueDetailPage() {
       )}
 
       {isLoading && (
-        <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Загрузка...
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-6 w-72" />
+            </div>
+            <Skeleton className="h-8 w-28" />
+          </div>
+
+          <Card>
+            <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="border-b">
+              <Skeleton className="h-5 w-32" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="border-b">
+              <Skeleton className="h-5 w-40" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1033,7 +1072,7 @@ export function IssueDetailPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Нет</p>
+                  <EmptyState size="compact" title="Нет" />
                 )}
                 <div className="mt-2 flex items-center gap-2">
                   <IssuePicker
@@ -1118,7 +1157,7 @@ export function IssueDetailPage() {
                     })}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Нет</p>
+                  <EmptyState size="compact" title="Нет" />
                 )}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Select
@@ -1214,7 +1253,7 @@ export function IssueDetailPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-muted-foreground">Нет</p>
+                <EmptyState size="compact" title="Нет" />
               )}
               <div>
                 <input
@@ -1300,7 +1339,7 @@ export function IssueDetailPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-muted-foreground">Нет</p>
+                <EmptyState size="compact" title="Нет" />
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={watcherInput} onValueChange={setWatcherInput}>
