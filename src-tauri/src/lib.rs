@@ -1,4 +1,9 @@
 mod proxy;
+mod tray;
+
+// Manager - трейт с get_webview_window/manage/state, нужен для перехвата
+// закрытия окна ниже (tray::setup сам импортирует его отдельно у себя).
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -21,9 +26,33 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      // System tray (issue #5) - иконка, меню, badge непрочитанных.
+      tray::setup(app.handle())?;
+
+      // Закрытие окна сворачивает приложение в трей вместо завершения
+      // процесса (issue #5, "Решено") - нужно, чтобы поллинг уведомлений
+      // (useNotifications.ts) продолжал работать в фоне. Реальное завершение
+      // процесса - только через "Выход" в меню трея (tray.rs, app.exit).
+      if let Some(window) = app.get_webview_window("main") {
+        // Клон дешёвый (WebviewWindow - хэндл поверх Arc) - нужен отдельно
+        // от window, чтобы не двигать window в замыкание, пока сам вызов
+        // on_window_event ещё держит &window как receiver.
+        let window_to_hide = window.clone();
+        window.on_window_event(move |event| {
+          if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            let _ = window_to_hide.hide();
+          }
+        });
+      }
+
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![proxy::proxy_request])
+    .invoke_handler(tauri::generate_handler![
+      proxy::proxy_request,
+      tray::set_tray_unread
+    ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

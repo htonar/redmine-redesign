@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate, useOutletContext } from "react-router";
+import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
+import { LogTimeDialog } from "@/components/time/LogTimeDialog";
 import { HotkeysHelpDialog } from "@/components/layout/HotkeysHelpDialog";
 import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import { NotificationSettingsDialog } from "@/components/layout/NotificationSettingsDialog";
@@ -13,7 +16,13 @@ import { useProjects } from "@/hooks/useProjects";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/notifications";
+import { syncTrayBadge } from "@/lib/tray";
+import { createTimeEntry } from "@/api/timeEntries";
+
+/** Событие из меню трея (см. src-tauri/src/tray.rs, LOG_TIME_EVENT). */
+const TRAY_LOG_TIME_EVENT = "tray://log-time";
 
 interface LayoutContext {
   selectedProjectId: number | null;
@@ -47,11 +56,13 @@ export function AppLayout() {
     user?.id,
     notificationSettings,
   );
+  const { activities } = useTimeEntryActivities(client);
   const navigate = useNavigate();
   const location = useLocation();
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
   const [isHotkeysHelpOpen, setIsHotkeysHelpOpen] = useState(false);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
+  const [isTrayLogTimeOpen, setIsTrayLogTimeOpen] = useState(false);
 
   // Тот же фильтр по add_issues, что и кнопка "Добавить задачу" на IssuesPage
   // (см. docs/permissions.md) - хоткей "c" не должен подсовывать проект без прав.
@@ -59,6 +70,31 @@ export function AppLayout() {
     () => projects.filter((p) => can("add_issues", p.id)),
     [projects, can],
   );
+  // Тот же фильтр по log_time, что и "Залогировать время" на TimeTrackingPage -
+  // пункт меню трея не должен подсовывать проект без прав.
+  const loggableProjects = useMemo(
+    () => projects.filter((p) => can("log_time", p.id)),
+    [projects, can],
+  );
+
+  // Пункт "Залогировать время" в меню трея (issue #5) - открывает диалог
+  // без разворачивания окна вручную, см. src-tauri/src/tray.rs.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    void listen(TRAY_LOG_TIME_EVENT, () => setIsTrayLogTimeOpen(true)).then(
+      (fn) => {
+        unlisten = fn;
+      },
+    );
+    return () => unlisten?.();
+  }, []);
+
+  // Badge-точка на иконке трея - синхронизируется с тем же unreadCount, что
+  // уже показывает NotificationsBell в Topbar (issue #5).
+  useEffect(() => {
+    void syncTrayBadge(unreadCount > 0);
+  }, [unreadCount]);
 
   useGlobalHotkeys({
     onNavigateIssues: () => navigate("/issues"),
@@ -127,6 +163,20 @@ export function AppLayout() {
         onCreated={(issue) => {
           setIsCreateIssueOpen(false);
           navigate(`/issues/${issue.id}`);
+        }}
+      />
+      {/* Глобальный диалог логирования времени для пункта "Залогировать
+          время" в меню трея (issue #5) - без trigger, только open/onOpenChange. */}
+      <LogTimeDialog
+        client={client}
+        projects={loggableProjects}
+        activities={activities}
+        defaultProjectId={selectedProjectId}
+        open={isTrayLogTimeOpen}
+        onOpenChange={setIsTrayLogTimeOpen}
+        onSubmit={async (input) => {
+          if (!client) return;
+          await createTimeEntry(client, input);
         }}
       />
       <HotkeysHelpDialog

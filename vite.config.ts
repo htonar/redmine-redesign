@@ -14,6 +14,16 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  server: {
+    watch: {
+      // src-tauri/target - директория Rust-сборки (Cargo.toml), не фронтовый
+      // код - Vite не должен её watch'ить. Без этого dev-сервер падает с
+      // EBUSY на файлах вроде target/debug/deps/app_lib.dll, залоченных
+      // текущим cargo-процессом, стоит запустить `cargo check`/`tauri dev`
+      // хоть раз (см. официальный Tauri+Vite quickstart).
+      ignored: ['**/src-tauri/**'],
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
