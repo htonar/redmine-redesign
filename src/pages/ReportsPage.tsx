@@ -1,4 +1,4 @@
-import { Loader2, RefreshCw } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -6,6 +6,9 @@ import { StatCard } from "@/components/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssueReport } from "@/hooks/useIssueReport";
 import type { ReportBucket } from "@/lib/issue-report";
+import { issueReportToCsv } from "@/lib/issue-report-csv";
+import { CSV_BOM } from "@/lib/csv";
+import { saveBlobAs } from "@/lib/save-file";
 import { useLayoutContext } from "./AppLayout";
 
 const CHART_COLOR_CLASSES = [
@@ -84,14 +87,34 @@ export function ReportsPage() {
     );
   }
 
+  function handleExport() {
+    if (!report) return;
+    const csv = CSV_BOM + issueReportToCsv(report);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const today = new Date().toISOString().slice(0, 10);
+    saveBlobAs(blob, `report-project-${selectedProjectId}-${today}.csv`);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Отчёты</h1>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={reload} disabled={isLoading}>
-          <RefreshCw className="size-3.5" />
-          Обновить
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={handleExport}
+            disabled={!report || isLoading}
+          >
+            <Download className="size-3.5" />
+            Экспорт в CSV
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={reload} disabled={isLoading}>
+            <RefreshCw className="size-3.5" />
+            Обновить
+          </Button>
+        </div>
       </div>
 
       {error && (

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -37,6 +37,9 @@ import {
   type TimeEntryListFilters,
 } from "@/api/timeEntries";
 import { canManageTimeEntry } from "@/lib/time-entry-permissions";
+import { timeEntriesToCsv } from "@/lib/time-entries-csv";
+import { CSV_BOM } from "@/lib/csv";
+import { saveBlobAs } from "@/lib/save-file";
 import { useLayoutContext } from "./AppLayout";
 
 type RangeValue = NonNullable<TimeEntryListFilters["spentOn"]> | "all";
@@ -158,6 +161,13 @@ export function TimeTrackingPage() {
     }
   }
 
+  function handleExport() {
+    const csv = CSV_BOM + timeEntriesToCsv(entries);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const today = new Date().toISOString().slice(0, 10);
+    saveBlobAs(blob, `time-entries-${scope}-${today}.csv`);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <WeeklyTimeDebtWidget
@@ -194,21 +204,34 @@ export function TimeTrackingPage() {
           </Select>
         </div>
 
-        {loggableProjects.length > 0 && (
-          <LogTimeDialog
-            client={client}
-            projects={loggableProjects}
-            activities={activities}
-            defaultProjectId={selectedProjectId}
-            onSubmit={handleCreate}
-            trigger={
-              <Button size="sm" className="gap-1.5">
-                <Plus className="size-3.5" />
-                Залогировать время
-              </Button>
-            }
-          />
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={handleExport}
+            disabled={entries.length === 0}
+          >
+            <Download className="size-3.5" />
+            Экспорт в CSV
+          </Button>
+
+          {loggableProjects.length > 0 && (
+            <LogTimeDialog
+              client={client}
+              projects={loggableProjects}
+              activities={activities}
+              defaultProjectId={selectedProjectId}
+              onSubmit={handleCreate}
+              trigger={
+                <Button size="sm" className="gap-1.5">
+                  <Plus className="size-3.5" />
+                  Залогировать время
+                </Button>
+              }
+            />
+          )}
+        </div>
       </div>
 
       {error && (
