@@ -51,6 +51,8 @@ import { useQueries } from "@/hooks/useQueries";
 import type { IssueListFilters } from "@/api/issues";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import { issueUrl } from "@/lib/redmine-url";
+import { openExternal } from "@/lib/open-external";
+import { isTauri } from "@tauri-apps/api/core";
 import type { IssueView } from "@/lib/issue-views-storage";
 import { useLayoutContext } from "./AppLayout";
 
@@ -441,7 +443,15 @@ export function IssuesPage() {
                           href={issueUrl(baseUrl, issue.id)}
                           target="_blank"
                           rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Tauri webview не открывает системный браузер
+                            // сам - issue #24.
+                            if (isTauri()) {
+                              e.preventDefault();
+                              openExternal(issueUrl(baseUrl, issue.id));
+                            }
+                          }}
                           className="text-muted-foreground hover:text-foreground"
                           aria-label="Открыть в Redmine"
                           title="Открыть в Redmine"
