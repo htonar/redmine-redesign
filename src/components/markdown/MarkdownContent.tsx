@@ -1,17 +1,39 @@
-import { GitPullRequest } from "lucide-react";
+import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { RedmineClient } from "@/api/client";
 import type { Attachment } from "@/api/attachments";
 import { Badge } from "@/components/ui/badge";
 import { useAttachmentImageUrls } from "@/components/markdown/useAttachmentImageUrls";
+import { usePrMrStatuses } from "@/hooks/usePrMrStatuses";
 import { extractPrMrLinks } from "@/lib/pr-mr-links";
+import type { PrMrStatus } from "@/lib/pr-mr-status";
 import { cn } from "@/lib/utils";
 
 const PR_MR_PLATFORM_LABEL = {
   github: "GitHub PR",
   gitlab: "GitLab MR",
 } as const;
+
+/**
+ * Живой статус (issue #22, шаг 2) меняет цвет самого чипа (решение из
+ * грилинга - не платформенный брендинг, а семантика статуса). Без статуса
+ * (undefined - нет токена / ошибка / еще грузится) - нейтральный `outline`,
+ * как было в шаге 1.
+ */
+const PR_MR_STATUS_ICON: Record<PrMrStatus, typeof GitPullRequest> = {
+  open: GitPullRequest,
+  merged: GitMerge,
+  closed: GitPullRequestClosed,
+  draft: GitPullRequestDraft,
+};
+
+const PR_MR_STATUS_CLASS: Record<PrMrStatus, string> = {
+  open: "border-transparent bg-emerald-600 text-white",
+  merged: "border-transparent bg-violet-600 text-white",
+  closed: "border-transparent bg-red-600 text-white",
+  draft: "border-transparent bg-muted-foreground/70 text-white",
+};
 
 export interface MarkdownContentProps {
   text: string;
@@ -40,10 +62,10 @@ export function MarkdownContent({
   className,
 }: MarkdownContentProps) {
   const imageUrls = useAttachmentImageUrls(client ?? null, attachments);
+  const prMrLinks = extractPrMrLinks(text);
+  const prMrStatuses = usePrMrStatuses(prMrLinks);
 
   if (!text.trim()) return null;
-
-  const prMrLinks = extractPrMrLinks(text);
 
   return (
     <>
@@ -80,14 +102,23 @@ export function MarkdownContent({
       {prMrLinks.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
           <span>Связанные:</span>
-          {prMrLinks.map((link) => (
-            <Badge key={link.url} variant="outline" asChild>
-              <a href={link.url} target="_blank" rel="noreferrer">
-                <GitPullRequest />
-                {PR_MR_PLATFORM_LABEL[link.platform]} #{link.number}
-              </a>
-            </Badge>
-          ))}
+          {prMrLinks.map((link) => {
+            const status = prMrStatuses[link.url];
+            const Icon = status ? PR_MR_STATUS_ICON[status] : GitPullRequest;
+            return (
+              <Badge
+                key={link.url}
+                variant="outline"
+                asChild
+                className={status ? PR_MR_STATUS_CLASS[status] : undefined}
+              >
+                <a href={link.url} target="_blank" rel="noreferrer">
+                  <Icon />
+                  {PR_MR_PLATFORM_LABEL[link.platform]} #{link.number}
+                </a>
+              </Badge>
+            );
+          })}
         </div>
       )}
     </>

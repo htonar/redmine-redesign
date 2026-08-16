@@ -46,21 +46,28 @@ SPA браузер блокирует. Решение - свой прокси-б
 отдельный пакет, не часть фронтового билда):
 
 - Клиент шлет запросы на `${VITE_REDMINE_PROXY_URL}/proxy/...` вместо прямого
-  обращения к Redmine, с заголовком `X-Redmine-Target: <baseUrl>` - реализовано
+  обращения к Redmine, с заголовком `X-Proxy-Target: <baseUrl>` - реализовано
   в `src/api/client.ts` (`proxyUrl` опция) и `src/contexts/AuthContext.tsx`.
-- Прокси форвардит запрос 1:1 в целевой Redmine, добавляет CORS-заголовки
+- Прокси форвардит запрос 1:1 в целевой апстрим, добавляет CORS-заголовки
   (`hono/cors`, origin из `ALLOWED_ORIGIN`).
 - Таргет динамический (любой Redmine), но целевой хост обязан быть в
-  `ALLOWED_REDMINE_HOSTS` (см. `server/.env.example`) - иначе прокси
-  превращается в открытый SSRF-прокси. Пустой `ALLOWED_REDMINE_HOSTS` -
+  `ALLOWED_PROXY_HOSTS` (см. `server/.env.example`) - иначе прокси
+  превращается в открытый SSRF-прокси. Пустой `ALLOWED_PROXY_HOSTS` -
   fail-closed (прокси отклоняет всё, 500).
 - Если `VITE_REDMINE_PROXY_URL` не задан - клиент работает напрямую (локальная
   разработка или инстансы с настроенным CORS).
-- Прокси не хранит и не логирует API-ключи - только форвардит заголовок
-  `X-Redmine-API-Key` транзитом.
+- Прокси не хранит и не логирует API-ключи/токены - только форвардит
+  заголовки (`X-Redmine-API-Key`, `Private-Token`) транзитом.
 - Логика вынесена в `createApp(config)` (`server/src/app.ts`), тестируемую
   через Hono `app.request()` без реального порта; `server/src/index.ts` -
   тонкий entrypoint (`serve()`).
+- **Прокси не Redmine-специфичный** - это универсальный `/proxy/*` механизм
+  с одним allowlist'ом хостов, используется и для живого статуса GitLab MR
+  (issue #22, шаг 2): GitLab REST API нигде не поддерживает CORS (см.
+  `gitlab-org/gitlab-foss#24596`, открыт с 2016), поэтому запросы к нему тоже
+  идут через `/proxy/*` с `X-Proxy-Target` + `Private-Token`. GitHub сюда не
+  добавляется - его REST API отдает CORS-заголовки из коробки (включая GitHub
+  Enterprise Server, `/api/v3`), запросы идут прямым `fetch()` без прокси.
 
 Запуск для разработки - два процесса: `npm run dev` в корне (фронт) и `npm run
 dev` в `server/` (прокси). Оба нужны, чтобы реально сходить в чей-то Redmine.
@@ -145,18 +152,27 @@ UI/UX оригинального Redmine (лишь бы оставаться в 
 выбрана вместо Electron ради веса дистрибутива (системный WebView, не
 бандлить Chromium+Node).
 
-- **Прокси не нужен вообще, не sidecar** - CORS есть только на уровне
-  браузера/webview; Rust `reqwest` (`src-tauri/src/proxy.rs`, команда
-  `proxy_request`) делает обычный исходящий HTTP-запрос без понятия CORS.
-  Форвардит 1:1, тот же контракт, что у `/proxy/*` в `server/src/index.ts`.
-  Тело - base64 в обе стороны (`src/api/tauriFetch.ts`, `invoke()` умеет
-  только JSON-совместимые значения).
-- `ALLOWED_REDMINE_HOSTS` в десктоп-сценарии не нужен - Tauri IPC не слушает
-  сеть, вызвать команду может только код самого webview.
+- **Node-прокси (`server/`) не нужен вообще, не sidecar** - CORS ограничение
+  webview-`fetch()` обходит не отсутствие CORS-проверки, а отдельный путь в
+  обход неё: Rust `reqwest` (`src-tauri/src/proxy.rs`, команда
+  `proxy_request`) делает обычный исходящий HTTP-запрос без понятия CORS,
+  вызывается через `invoke()` вместо `fetch()`. Форвардит 1:1, тот же
+  контракт, что у `/proxy/*` в `server/src/app.ts`. Тело - base64 в обе
+  стороны (`src/api/tauriFetch.ts`, `invoke()` умеет только
+  JSON-совместимые значения). Тот же механизм (уже универсальный, не
+  Redmine-специфичный) переиспользуется для живого статуса GitLab MR (issue
+  #22, шаг 2) - webview `fetch()` для GitLab CORS все равно бы заблокировал,
+  как в обычном браузере; для GitHub он не нужен - его CORS запросы идут
+  прямым `fetch()` даже в Tauri.
+- Хостовый allowlist (`ALLOWED_PROXY_HOSTS` у Node-прокси) в десктоп-сценарии
+  не нужен - Tauri IPC не слушает сеть, вызвать команду может только код
+  самого webview.
 - Интеграция - `src/api/client.ts`: `isTauri()` определяет режим при создании
   клиента, в Tauri-режиме `fetch` кастомный (`tauriFetch`), `baseUrl` - сразу
-  реальный Redmine, без `X-Redmine-Target`. Прокси-сервер (`server/`) не
-  участвует в десктоп-сборке вообще - веб/Docker-сборка как была.
+  реальный Redmine, без `X-Proxy-Target`. Node-прокси (`server/`) не
+  участвует в десктоп-сборке вообще для Redmine-запросов - веб/Docker-сборка
+  как была; для GitLab десктоп-сборка использует свой invoke-путь (см. выше),
+  тоже без Node-прокси.
 - Кроссплатформенность: `reqwest` с `rustls-tls` (без системной OpenSSL),
   `tauri.conf.json` → `bundle.targets: "all"` (nsis для Windows и т.д.).
 - **GitHub Actions** (`.github/workflows/desktop-release.yml`) - матрица
@@ -204,7 +220,7 @@ UI/UX оригинального Redmine (лишь бы оставаться в 
   с учетом направления, включая зеркальные пары типа `blocks`/`blocked`),
   `issue-form.ts` (`diffFormValues`/`formatCustomFieldValue`), `src/api/issues.ts`
   (`listIssues` - построение query через мок `RedmineClient.GET`),
-  `server/src/app.ts` (валидация `X-Redmine-Target`, fail-closed allowlist,
+  `server/src/app.ts` (валидация `X-Proxy-Target`, fail-closed allowlist,
   форвардинг, сетевая ошибка → 502, регрессионный тест на баг с `204`-ответом
   - прокси обязан звать `body.cancel()` перед возвратом пустого тела, иначе
   портится keep-alive соединение и следующий запрос падает `503`).

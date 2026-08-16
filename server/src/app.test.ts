@@ -3,7 +3,7 @@ import { createApp } from "./app.js";
 
 const CONFIG = {
   allowedOrigin: "http://localhost:5183",
-  allowedRedmineHosts: ["redmine.example.com"],
+  allowedProxyHosts: ["redmine.example.com"],
 };
 
 afterEach(() => {
@@ -11,18 +11,18 @@ afterEach(() => {
 });
 
 describe("/proxy/*", () => {
-  it("без X-Redmine-Target - 400", async () => {
+  it("без X-Proxy-Target - 400", async () => {
     const app = createApp(CONFIG);
     const res = await app.request("/proxy/issues.json");
     expect(res.status).toBe(400);
   });
 
-  it("невалидный URL в X-Redmine-Target - 400", async () => {
+  it("невалидный URL в X-Proxy-Target - 400", async () => {
     const app = createApp(CONFIG);
     const res = await app.request("/proxy/issues.json", {
       // Заголовок - ByteString (Fetch API), кириллица сюда не пройдёт вовсе -
       // берём ASCII-строку, невалидную именно как URL.
-      headers: { "X-Redmine-Target": "not a valid url" },
+      headers: { "X-Proxy-Target": "not a valid url" },
     });
     expect(res.status).toBe(400);
   });
@@ -30,7 +30,7 @@ describe("/proxy/*", () => {
   it("не-https и не-localhost - 400", async () => {
     const app = createApp(CONFIG);
     const res = await app.request("/proxy/issues.json", {
-      headers: { "X-Redmine-Target": "http://redmine.example.com" },
+      headers: { "X-Proxy-Target": "http://redmine.example.com" },
     });
     expect(res.status).toBe(400);
   });
@@ -38,22 +38,22 @@ describe("/proxy/*", () => {
   it("http на localhost - разрешен (проходит валидацию, дальше зависит от allowlist)", async () => {
     const app = createApp({
       allowedOrigin: CONFIG.allowedOrigin,
-      allowedRedmineHosts: ["localhost"],
+      allowedProxyHosts: ["localhost"],
     });
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const res = await app.request("/proxy/issues.json", {
-      headers: { "X-Redmine-Target": "http://localhost:3000" },
+      headers: { "X-Proxy-Target": "http://localhost:3000" },
     });
     expect(res.status).toBe(200);
   });
 
-  it("пустой allowedRedmineHosts - 500 (fail-closed)", async () => {
-    const app = createApp({ allowedOrigin: CONFIG.allowedOrigin, allowedRedmineHosts: [] });
+  it("пустой allowedProxyHosts - 500 (fail-closed)", async () => {
+    const app = createApp({ allowedOrigin: CONFIG.allowedOrigin, allowedProxyHosts: [] });
     const res = await app.request("/proxy/issues.json", {
-      headers: { "X-Redmine-Target": "https://redmine.example.com" },
+      headers: { "X-Proxy-Target": "https://redmine.example.com" },
     });
     expect(res.status).toBe(500);
   });
@@ -61,12 +61,12 @@ describe("/proxy/*", () => {
   it("хост не в allowlist - 403", async () => {
     const app = createApp(CONFIG);
     const res = await app.request("/proxy/issues.json", {
-      headers: { "X-Redmine-Target": "https://other-redmine.example.com" },
+      headers: { "X-Proxy-Target": "https://other-redmine.example.com" },
     });
     expect(res.status).toBe(403);
   });
 
-  it("успешный форвард - метод/путь/заголовки/тело доходят до Redmine как есть", async () => {
+  it("успешный форвард - метод/путь/заголовки/тело доходят до апстрима как есть", async () => {
     const app = createApp(CONFIG);
     const fetchMock = vi
       .fn()
@@ -81,7 +81,7 @@ describe("/proxy/*", () => {
     const res = await app.request("/proxy/issues.json?foo=bar", {
       method: "POST",
       headers: {
-        "X-Redmine-Target": "https://redmine.example.com",
+        "X-Proxy-Target": "https://redmine.example.com",
         "X-Redmine-API-Key": "secret-key",
         "Content-Type": "application/json",
       },
@@ -101,6 +101,27 @@ describe("/proxy/*", () => {
     expect(init.headers.get("content-type")).toBe("application/json");
   });
 
+  it("форвардит Private-Token (GitLab) как есть - см. issue #22, шаг 2", async () => {
+    const app = createApp({
+      allowedOrigin: CONFIG.allowedOrigin,
+      allowedProxyHosts: ["gitlab.example.com"],
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await app.request("/proxy/api/v4/projects/1/merge_requests/7", {
+      headers: {
+        "X-Proxy-Target": "https://gitlab.example.com",
+        "Private-Token": "glpat-secret",
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.get("private-token")).toBe("glpat-secret");
+  });
+
   it("апстрим недоступен (сетевая ошибка) - 502, не необработанное исключение", async () => {
     const app = createApp(CONFIG);
     vi.stubGlobal(
@@ -108,12 +129,12 @@ describe("/proxy/*", () => {
       vi.fn().mockRejectedValue(new Error("network down")),
     );
     const res = await app.request("/proxy/issues.json", {
-      headers: { "X-Redmine-Target": "https://redmine.example.com" },
+      headers: { "X-Proxy-Target": "https://redmine.example.com" },
     });
     expect(res.status).toBe(502);
   });
 
-  it("регрессия: 204 от Redmine - проксируется как 204 с пустым телом, поток тела отменяется", async () => {
+  it("регрессия: 204 от апстрима - проксируется как 204 с пустым телом, поток тела отменяется", async () => {
     const app = createApp(CONFIG);
     const cancel = vi.fn().mockResolvedValue(undefined);
     const upstreamResponse = new Response(null, { status: 204 });
@@ -127,7 +148,7 @@ describe("/proxy/*", () => {
 
     const res = await app.request("/proxy/issues/1/watchers/2.json", {
       method: "DELETE",
-      headers: { "X-Redmine-Target": "https://redmine.example.com" },
+      headers: { "X-Proxy-Target": "https://redmine.example.com" },
     });
 
     expect(res.status).toBe(204);

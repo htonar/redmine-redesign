@@ -26,6 +26,10 @@ const FORWARDED_REQUEST_HEADERS: &[&str] = &[
     "authorization",
     "content-type",
     "x-redmine-switch-user",
+    // GitLab REST API - см. issue #22, шаг 2 (живой статус MR). GitHub не
+    // нужен здесь отдельно - его CORS поддержка означает, что в декстопе
+    // (как и в вебе) запрос идет прямым fetch(), эта команда не участвует.
+    "private-token",
 ];
 
 #[derive(serde::Serialize)]

@@ -1,8 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 
+const usePrMrStatusesMock = vi.hoisted(() =>
+  vi.fn((_links: unknown[]) => ({}) as Record<string, string | undefined>),
+);
+vi.mock("@/hooks/usePrMrStatuses", () => ({
+  usePrMrStatuses: (links: unknown[]) => usePrMrStatusesMock(links),
+}));
+
 describe("MarkdownContent", () => {
+  afterEach(() => {
+    usePrMrStatusesMock.mockReset();
+    usePrMrStatusesMock.mockReturnValue({});
+  });
+
   it("не рендерит строку со связанными PR/MR, если ссылок нет", () => {
     render(<MarkdownContent text="обычное описание задачи" />);
     expect(screen.queryByText("Связанные:")).not.toBeInTheDocument();
@@ -36,6 +48,17 @@ describe("MarkdownContent", () => {
     expect(
       screen.getByRole("link", { name: /GitLab MR #7/ }),
     ).toBeInTheDocument();
+  });
+
+  it("подсвечивает чип цветом статуса, если статус известен", () => {
+    usePrMrStatusesMock.mockReturnValue({
+      "https://github.com/acme/widget/pull/42": "merged",
+    });
+    render(
+      <MarkdownContent text="см. https://github.com/acme/widget/pull/42" />,
+    );
+    const chip = screen.getByRole("link", { name: /GitHub PR #42/ });
+    expect(chip).toHaveClass("bg-violet-600");
   });
 
   it("не дублирует чип при повторной ссылке на тот же PR", () => {

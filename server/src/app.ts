@@ -2,17 +2,26 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 /**
- * Прокси для обхода CORS на стороне Redmine-сервера.
+ * Универсальный прокси для обхода CORS - изначально только для Redmine, с
+ * issue #22 (шаг 2) расширен на GitHub/GitLab (нужен только GitLab - у
+ * GitHub REST API CORS есть из коробки, см. docs, живой статус PR/MR идёт
+ * туда прямым fetch без прокси).
  *
  * Redmine (по крайней мере в дефолтной конфигурации, см. CLAUDE.md) не отдает
- * Access-Control-Allow-Origin ни на обычные запросы, ни на preflight - браузер
- * блокирует прямые запросы SPA к нему. Этот сервис ничего не знает про домен
- * Redmine заранее: клиент указывает целевой инстанс в заголовке
- * X-Redmine-Target (тот же адрес, что пользователь вводит на экране логина),
+ * Access-Control-Allow-Origin ни на обычные запросы, ни на preflight; GitLab
+ * REST API не отдает их вообще ни при какой конфигурации (открытый issue у
+ * них с 2016 - gitlab-org/gitlab-foss#24596) - в обоих случаях браузер
+ * блокирует прямой fetch из SPA. Этот сервис ничего не знает про целевой
+ * домен заранее: клиент указывает адрес в заголовке X-Proxy-Target (базовый
+ * URL Redmine-инстанса, или https://gitlab.com / self-hosted GitLab),
  * прокси форвардит запрос туда 1:1 и добавляет CORS-заголовки в ответе.
  *
- * Чтобы не превращать сервис в открытый SSRF-прокси, целевой хост обязан быть
- * в ALLOWED_REDMINE_HOSTS - без явного разрешения запрос отклоняется.
+ * Один механизм на все три цели (Redmine/GitHub-не нужен/GitLab), не
+ * отдельные маршруты - так решили в грилинге к issue #22 шагу 2: меньше
+ * кода, единая точка форвардинга. Разграничение по-прежнему на уровне
+ * allowlist: чтобы не превращать сервис в открытый SSRF-прокси, целевой хост
+ * обязан быть в ALLOWED_PROXY_HOSTS - без явного разрешения запрос
+ * отклоняется, независимо от того, Redmine это или GitLab.
  *
  * Логика роутов вынесена в createApp(config) отдельно от index.ts (тонкий
  * entrypoint, читает process.env и вызывает serve()) - чтобы тестировать
@@ -21,7 +30,7 @@ import { cors } from "hono/cors";
 
 export interface AppConfig {
   allowedOrigin: string;
-  allowedRedmineHosts: string[];
+  allowedProxyHosts: string[];
 }
 
 const FORWARDED_REQUEST_HEADERS = [
@@ -29,6 +38,8 @@ const FORWARDED_REQUEST_HEADERS = [
   "authorization",
   "content-type",
   "x-redmine-switch-user",
+  // GitLab REST API - см. issue #22, шаг 2 (живой статус MR).
+  "private-token",
 ];
 
 export function createApp(config: AppConfig): Hono {
@@ -38,7 +49,12 @@ export function createApp(config: AppConfig): Hono {
     "*",
     cors({
       origin: config.allowedOrigin,
-      allowHeaders: ["Content-Type", "X-Redmine-API-Key", "X-Redmine-Target"],
+      allowHeaders: [
+        "Content-Type",
+        "X-Redmine-API-Key",
+        "Private-Token",
+        "X-Proxy-Target",
+      ],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     }),
   );
@@ -46,31 +62,31 @@ export function createApp(config: AppConfig): Hono {
   app.get("/healthz", (c) => c.json({ ok: true }));
 
   app.all("/proxy/*", async (c) => {
-    const targetHeader = c.req.header("X-Redmine-Target");
+    const targetHeader = c.req.header("X-Proxy-Target");
     if (!targetHeader) {
-      return c.json({ error: "Заголовок X-Redmine-Target обязателен." }, 400);
+      return c.json({ error: "Заголовок X-Proxy-Target обязателен." }, 400);
     }
 
     let target: URL;
     try {
       target = new URL(targetHeader);
     } catch {
-      return c.json({ error: "X-Redmine-Target - не валидный URL." }, 400);
+      return c.json({ error: "X-Proxy-Target - не валидный URL." }, 400);
     }
 
     const isLocalHost =
       target.hostname === "localhost" || target.hostname === "127.0.0.1";
     if (target.protocol !== "https:" && !isLocalHost) {
-      return c.json({ error: "Целевой инстанс должен быть по https." }, 400);
+      return c.json({ error: "Целевой хост должен быть по https." }, 400);
     }
 
-    if (config.allowedRedmineHosts.length === 0) {
+    if (config.allowedProxyHosts.length === 0) {
       return c.json(
-        { error: "Прокси не настроен: ALLOWED_REDMINE_HOSTS пуст на сервере." },
+        { error: "Прокси не настроен: ALLOWED_PROXY_HOSTS пуст на сервере." },
         500,
       );
     }
-    if (!config.allowedRedmineHosts.includes(target.hostname)) {
+    if (!config.allowedProxyHosts.includes(target.hostname)) {
       return c.json(
         { error: `Хост "${target.hostname}" не в списке разрешенных.` },
         403,

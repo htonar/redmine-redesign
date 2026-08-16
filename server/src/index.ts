@@ -7,21 +7,21 @@ import { createApp } from "./app.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? "http://localhost:5183";
-const ALLOWED_REDMINE_HOSTS = (process.env.ALLOWED_REDMINE_HOSTS ?? "")
+const ALLOWED_PROXY_HOSTS = (process.env.ALLOWED_PROXY_HOSTS ?? "")
   .split(",")
   .map((host) => host.trim())
   .filter(Boolean);
 
 const app = createApp({
   allowedOrigin: ALLOWED_ORIGIN,
-  allowedRedmineHosts: ALLOWED_REDMINE_HOSTS,
+  allowedProxyHosts: ALLOWED_PROXY_HOSTS,
 });
 
 serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`redmine-proxy слушает на http://localhost:${info.port}`);
-  if (ALLOWED_REDMINE_HOSTS.length === 0) {
+  if (ALLOWED_PROXY_HOSTS.length === 0) {
     console.warn(
-      "ВНИМАНИЕ: ALLOWED_REDMINE_HOSTS не задан - все запросы будут отклонены (403/500).",
+      "ВНИМАНИЕ: ALLOWED_PROXY_HOSTS не задан - все запросы будут отклонены (403/500).",
     );
   }
 });
