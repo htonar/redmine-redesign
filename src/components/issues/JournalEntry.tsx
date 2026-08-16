@@ -2,7 +2,12 @@ import type { ReactNode } from "react";
 import type { Issue } from "@/api/issues";
 import type { Attachment } from "@/api/attachments";
 import type { RedmineClient } from "@/api/client";
-import { FIELD_LABELS, formatDateTime } from "@/lib/journal-format";
+import {
+  FIELD_LABELS,
+  formatDateTime,
+  resolveJournalFieldValue,
+  type JournalValueMaps,
+} from "@/lib/journal-format";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 
 interface JournalEntryProps {
@@ -23,6 +28,14 @@ interface JournalEntryProps {
    */
   customFieldNames?: Record<number, string>;
   /**
+   * Карты id -> имя для полей типа status_id/priority_id/tracker_id и т.п.
+   * (см. resolveJournalFieldValue) - без них история показывает голые
+   * числа. Опционально по тем же причинам, что и customFieldNames -
+   * ActivityFeed на дашборде их не грузит, там записи об изменении этих
+   * полей показывают id как fallback.
+   */
+  valueMaps?: JournalValueMaps;
+  /**
    * Вложения задачи и клиент - для резолва картинок, вставленных по Ctrl+V
    * прямо в комментарий (см. MarkdownContent). Опционально - ActivityFeed на
    * дашборде их не грузит, комментарии там просто без инлайн-картинок.
@@ -36,6 +49,7 @@ export function JournalEntry({
   journal,
   header,
   customFieldNames,
+  valueMaps,
   attachments,
   client,
 }: JournalEntryProps) {
@@ -62,9 +76,19 @@ export function JournalEntry({
               d.property === "cf"
                 ? (customFieldNames?.[Number(d.name)] ?? `Поле #${d.name}`)
                 : (FIELD_LABELS[d.name] ?? d.name);
+            const oldValue = resolveJournalFieldValue(
+              d.name,
+              d.old_value,
+              valueMaps ?? {},
+            );
+            const newValue = resolveJournalFieldValue(
+              d.name,
+              d.new_value,
+              valueMaps ?? {},
+            );
             return (
               <li key={i}>
-                {label}: {d.old_value ?? "—"} → {d.new_value ?? "—"}
+                {label}: {oldValue} → {newValue}
               </li>
             );
           })}

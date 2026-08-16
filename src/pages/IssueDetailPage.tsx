@@ -16,6 +16,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -45,6 +46,7 @@ import { useIssueSummaries } from "@/hooks/useIssueSummaries";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
 import { useTrackers } from "@/hooks/useTrackers";
+import { useIssueStatuses } from "@/hooks/useIssueStatuses";
 import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectCategories } from "@/hooks/useProjectCategories";
@@ -81,6 +83,16 @@ import { formatFileSize } from "@/lib/utils";
 import { celebrate } from "@/lib/celebrate";
 import { diffFormValues, formatCustomFieldValue } from "@/lib/issue-form";
 import { issueUrl } from "@/lib/redmine-url";
+import { openExternal } from "@/lib/open-external";
+import { isTauri } from "@tauri-apps/api/core";
+import { chatCompletion } from "@/api/ai";
+import { buildTldrMessages } from "@/lib/ai-tldr-prompt";
+import { isAiConfigured, loadAiSettings } from "@/lib/ai-settings-storage";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", {
@@ -164,6 +176,28 @@ export function IssueDetailPage() {
   const { members } = useProjectMembers(client, projectId, user);
   const { categories } = useProjectCategories(client, projectId);
   const { versions } = useProjectVersions(client, projectId);
+  const { statuses } = useIssueStatuses(client);
+
+  // Карты id -> имя для истории изменений (JournalEntry) - без них
+  // status_id/priority_id/... в журнале показывают голые числа (issue,
+  // repoted вручную). project_id сюда не входит - смена проекта задачи
+  // штука редкая, и нужен был бы отдельный справочник "все проекты"
+  // ради одного поля, не оправдано.
+  const journalValueMaps = useMemo(
+    () => ({
+      status_id: Object.fromEntries(statuses.map((s) => [s.id, s.name])),
+      priority_id: Object.fromEntries(priorities.map((p) => [p.id, p.name])),
+      tracker_id: Object.fromEntries(trackers.map((t) => [t.id, t.name])),
+      fixed_version_id: Object.fromEntries(
+        versions.map((v) => [v.id, v.name]),
+      ),
+      category_id: Object.fromEntries(categories.map((c) => [c.id, c.name])),
+      assigned_to_id: Object.fromEntries(
+        members.map((m) => [m.id, m.name]),
+      ),
+    }),
+    [statuses, priorities, trackers, versions, categories, members],
+  );
   const { definitions: customFieldDefinitions } =
     useCustomFieldDefinitions(client);
   // Для истории изменений (JournalEntry) - записи об изменении custom field
@@ -202,6 +236,40 @@ export function IssueDetailPage() {
   const [pendingCommentUploads, setPendingCommentUploads] = useState<
     UploadedFile[]
   >([]);
+
+  // TL;DR обсуждения через AI-ассистент (issue #23) - эфемерный результат,
+  // не персистится. Кнопка видна только если AI настроен в /profile ->
+  // "Интеграции" (см. IntegrationsPage.tsx).
+  type TldrState =
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "success"; text: string }
+    | { status: "error"; message: string };
+  const [tldrState, setTldrState] = useState<TldrState>({ status: "idle" });
+
+  async function handleTldr() {
+    const settings = loadAiSettings();
+    if (!isAiConfigured(settings)) return;
+
+    setTldrState({ status: "loading" });
+    const messages = buildTldrMessages(issue?.description ?? undefined, issue?.journals ?? []);
+    const result = await chatCompletion(settings, messages);
+
+    if (result.ok) {
+      setTldrState({ status: "success", text: result.text });
+      return;
+    }
+
+    const message =
+      result.error.kind === "invalid_key"
+        ? "Неверный API-ключ"
+        : result.error.kind === "rate_limited"
+          ? "Превышен лимит запросов к AI-провайдеру"
+          : result.error.kind === "network"
+            ? "Нет соединения с AI-провайдером"
+            : "Не удалось получить ответ от AI-провайдера";
+    setTldrState({ status: "error", message });
+  }
 
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<IssueFormValues | null>(null);
@@ -748,6 +816,14 @@ export function IssueDetailPage() {
                     href={issueUrl(baseUrl, issue.id)}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(e) => {
+                      // Tauri webview не открывает системный браузер сам -
+                      // issue #24.
+                      if (isTauri()) {
+                        e.preventDefault();
+                        openExternal(issueUrl(baseUrl, issue.id));
+                      }
+                    }}
                     className="text-muted-foreground hover:text-foreground"
                     aria-label="Открыть в Redmine"
                     title="Открыть в Redmine"
@@ -1434,8 +1510,45 @@ export function IssueDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader className="border-b">
+            <CardHeader className="flex flex-row items-center justify-between border-b">
               <CardTitle>История и комментарии</CardTitle>
+              {isAiConfigured(loadAiSettings()) && (
+                <Popover
+                  onOpenChange={(open) => {
+                    // Не перезапрашиваем при повторном открытии, если уже
+                    // есть результат (или запрос уже летит) - иначе каждое
+                    // открытие popover тратит лишний запрос к AI-провайдеру.
+                    // Ошибку допускаем повторить - мало ли, сеть/лимит
+                    // временные.
+                    if (open && tldrState.status !== "loading" && tldrState.status !== "success") {
+                      handleTldr();
+                    }
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {tldrState.status === "loading" ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-4" />
+                      )}
+                      TL;DR
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    {tldrState.status === "loading" && (
+                      <p className="text-muted-foreground">Суммаризирую...</p>
+                    )}
+                    {tldrState.status === "success" && <p>{tldrState.text}</p>}
+                    {tldrState.status === "error" && (
+                      <p className="text-destructive">{tldrState.message}</p>
+                    )}
+                    {tldrState.status === "idle" && (
+                      <p className="text-muted-foreground">Суммаризирую...</p>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              )}
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <div className="flex flex-col">
@@ -1445,6 +1558,7 @@ export function IssueDetailPage() {
                       key={j.id}
                       journal={j}
                       customFieldNames={customFieldNames}
+                      valueMaps={journalValueMaps}
                       attachments={issue.attachments}
                       client={client}
                     />
