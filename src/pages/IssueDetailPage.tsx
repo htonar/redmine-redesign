@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  ExternalLink,
   Loader2,
   Paperclip,
   Pencil,
@@ -79,6 +80,7 @@ import { formatDateTime } from "@/lib/journal-format";
 import { formatFileSize } from "@/lib/utils";
 import { celebrate } from "@/lib/celebrate";
 import { diffFormValues, formatCustomFieldValue } from "@/lib/issue-form";
+import { issueUrl } from "@/lib/redmine-url";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", {
@@ -151,7 +153,7 @@ function issueToFormValues(
 export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { client, can, user } = useAuth();
+  const { client, can, user, baseUrl } = useAuth();
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
   const issueId = id ? Number(id) : null;
@@ -737,8 +739,22 @@ export function IssueDetailPage() {
         <>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-xs text-muted-foreground">
-                {issue.tracker?.name ?? "Задача"} #{issue.id}
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>
+                  {issue.tracker?.name ?? "Задача"} #{issue.id}
+                </span>
+                {baseUrl && (
+                  <a
+                    href={issueUrl(baseUrl, issue.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Открыть в Redmine"
+                    title="Открыть в Redmine"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </a>
+                )}
               </div>
               <h1 className="text-xl font-semibold tracking-tight">
                 {issue.subject}

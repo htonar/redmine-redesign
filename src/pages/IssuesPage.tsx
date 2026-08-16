@@ -5,6 +5,7 @@ import {
   ArrowUp,
   Bookmark,
   ChevronDown,
+  ExternalLink,
   Kanban,
   List,
   Loader2,
@@ -49,6 +50,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useQueries } from "@/hooks/useQueries";
 import type { IssueListFilters } from "@/api/issues";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
+import { issueUrl } from "@/lib/redmine-url";
 import type { IssueView } from "@/lib/issue-views-storage";
 import { useLayoutContext } from "./AppLayout";
 
@@ -370,13 +372,14 @@ export function IssuesPage() {
                 ))}
                 <TableHead>Проект</TableHead>
                 <TableHead>Исполнитель</TableHead>
+                <TableHead className="w-9" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={9}>
                       <Skeleton className="h-5 w-full" />
                     </TableCell>
                   </TableRow>
@@ -432,6 +435,21 @@ export function IssuesPage() {
                     </TableCell>
                     <TableCell>{issue.project?.name ?? "-"}</TableCell>
                     <TableCell>{issue.assigned_to?.name ?? "-"}</TableCell>
+                    <TableCell>
+                      {baseUrl && (
+                        <a
+                          href={issueUrl(baseUrl, issue.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="Открыть в Redmine"
+                          title="Открыть в Redmine"
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
             </TableBody>
