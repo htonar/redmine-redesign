@@ -1,9 +1,17 @@
+import { GitPullRequest } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { RedmineClient } from "@/api/client";
 import type { Attachment } from "@/api/attachments";
+import { Badge } from "@/components/ui/badge";
 import { useAttachmentImageUrls } from "@/components/markdown/useAttachmentImageUrls";
+import { extractPrMrLinks } from "@/lib/pr-mr-links";
 import { cn } from "@/lib/utils";
+
+const PR_MR_PLATFORM_LABEL = {
+  github: "GitHub PR",
+  gitlab: "GitLab MR",
+} as const;
 
 export interface MarkdownContentProps {
   text: string;
@@ -35,36 +43,53 @@ export function MarkdownContent({
 
   if (!text.trim()) return null;
 
+  const prMrLinks = extractPrMrLinks(text);
+
   return (
-    <div
-      className={cn(
-        "prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-code:before:content-none prose-code:after:content-none",
-        className,
-      )}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          img: ({ src, alt }) => {
-            const resolved =
-              typeof src === "string" && imageUrls[src] ? imageUrls[src] : src;
-            return (
-              <img
-                src={resolved}
-                alt={alt ?? ""}
-                className="rounded-lg border border-border"
-              />
-            );
-          },
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noreferrer">
-              {children}
-            </a>
-          ),
-        }}
+    <>
+      <div
+        className={cn(
+          "prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-code:before:content-none prose-code:after:content-none",
+          className,
+        )}
       >
-        {text}
-      </ReactMarkdown>
-    </div>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            img: ({ src, alt }) => {
+              const resolved =
+                typeof src === "string" && imageUrls[src] ? imageUrls[src] : src;
+              return (
+                <img
+                  src={resolved}
+                  alt={alt ?? ""}
+                  className="rounded-lg border border-border"
+                />
+              );
+            },
+            a: ({ href, children }) => (
+              <a href={href} target="_blank" rel="noreferrer">
+                {children}
+              </a>
+            ),
+          }}
+        >
+          {text}
+        </ReactMarkdown>
+      </div>
+      {prMrLinks.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+          <span>Связанные:</span>
+          {prMrLinks.map((link) => (
+            <Badge key={link.url} variant="outline" asChild>
+              <a href={link.url} target="_blank" rel="noreferrer">
+                <GitPullRequest />
+                {PR_MR_PLATFORM_LABEL[link.platform]} #{link.number}
+              </a>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
