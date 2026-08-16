@@ -57,7 +57,7 @@ npm run api:generate      # перегенерировать TS-типы из ap
 ```sh
 cd server
 npm install
-cp .env.example .env    # прописать ALLOWED_REDMINE_HOSTS
+cp .env.example .env    # прописать ALLOWED_PROXY_HOSTS
 npm run dev
 ```
 

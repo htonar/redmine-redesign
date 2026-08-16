@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { extractPrMrLinks } from "./pr-mr-links";
 
 describe("extractPrMrLinks", () => {
-  it("находит голую ссылку на GitHub PR", () => {
+  it("находит голую ссылку на GitHub PR и извлекает host/owner/repo", () => {
     expect(
       extractPrMrLinks("см. https://github.com/acme/widget/pull/42 для деталей"),
     ).toEqual([
@@ -10,6 +10,9 @@ describe("extractPrMrLinks", () => {
         platform: "github",
         url: "https://github.com/acme/widget/pull/42",
         number: 42,
+        host: "github.com",
+        owner: "acme",
+        repo: "widget",
       },
     ]);
   });
@@ -22,11 +25,14 @@ describe("extractPrMrLinks", () => {
         platform: "github",
         url: "https://github.com/acme/widget/pull/42",
         number: 42,
+        host: "github.com",
+        owner: "acme",
+        repo: "widget",
       },
     ]);
   });
 
-  it("находит голую ссылку на GitLab MR (gitlab.com)", () => {
+  it("находит голую ссылку на GitLab MR (gitlab.com) и извлекает host/projectPath", () => {
     expect(
       extractPrMrLinks(
         "https://gitlab.com/acme/widget/-/merge_requests/7 готов к ревью",
@@ -36,6 +42,8 @@ describe("extractPrMrLinks", () => {
         platform: "gitlab",
         url: "https://gitlab.com/acme/widget/-/merge_requests/7",
         number: 7,
+        host: "gitlab.com",
+        projectPath: "acme/widget",
       },
     ]);
   });
@@ -50,6 +58,8 @@ describe("extractPrMrLinks", () => {
         platform: "gitlab",
         url: "https://git.internal.company.com/group/subgroup/project/-/merge_requests/123",
         number: 123,
+        host: "git.internal.company.com",
+        projectPath: "group/subgroup/project",
       },
     ]);
   });
@@ -62,6 +72,9 @@ describe("extractPrMrLinks", () => {
         platform: "github",
         url: "https://git.internal.company.com/acme/widget/pull/9",
         number: 9,
+        host: "git.internal.company.com",
+        owner: "acme",
+        repo: "widget",
       },
     ]);
   });
@@ -83,11 +96,16 @@ describe("extractPrMrLinks", () => {
         platform: "github",
         url: "https://github.com/acme/widget/pull/42",
         number: 42,
+        host: "github.com",
+        owner: "acme",
+        repo: "widget",
       },
       {
         platform: "gitlab",
         url: "https://gitlab.com/acme/widget/-/merge_requests/7",
         number: 7,
+        host: "gitlab.com",
+        projectPath: "acme/widget",
       },
     ]);
   });
@@ -103,6 +121,9 @@ describe("extractPrMrLinks", () => {
         platform: "github",
         url: "https://github.com/acme/widget/pull/42",
         number: 42,
+        host: "github.com",
+        owner: "acme",
+        repo: "widget",
       },
     ]);
   });
@@ -118,11 +139,16 @@ describe("extractPrMrLinks", () => {
         platform: "gitlab",
         url: "https://gitlab.com/acme/widget/-/merge_requests/7",
         number: 7,
+        host: "gitlab.com",
+        projectPath: "acme/widget",
       },
       {
         platform: "github",
         url: "https://github.com/acme/widget/pull/42",
         number: 42,
+        host: "github.com",
+        owner: "acme",
+        repo: "widget",
       },
     ]);
   });

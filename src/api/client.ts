@@ -20,7 +20,7 @@ export interface RedmineClientOptions {
    * Базовый URL прокси-сервера (server/), если он используется. Большинство
    * Redmine-инстансов не отдают CORS-заголовки, поэтому браузер напрямую до них
    * не достучится - см. CLAUDE.md, раздел "CORS и прокси-бэкенд". Когда задан,
-   * запросы идут на `${proxyUrl}/proxy/...` с заголовком X-Redmine-Target,
+   * запросы идут на `${proxyUrl}/proxy/...` с заголовком X-Proxy-Target,
    * вместо прямого обращения к `baseUrl`.
    */
   proxyUrl?: string;
@@ -59,11 +59,14 @@ export function createRedmineClient({ baseUrl, auth, proxyUrl }: RedmineClientOp
     } else if (auth?.login && auth?.password) {
       headers["Authorization"] = `Basic ${btoa(`${auth.login}:${auth.password}`)}`;
     }
-    // X-Redmine-Target нужен только Node-прокси, чтобы понять, куда
+    // X-Proxy-Target нужен только Node-прокси (server/), чтобы понять, куда
     // форвардить (сам он слушает на своем origin) - в Tauri-режиме fetch идет
-    // прямо на baseUrl, отдельный заголовок с адресом цели не нужен.
+    // прямо на baseUrl, отдельный заголовок с адресом цели не нужен. Тот же
+    // универсальный прокси используется и для живого статуса GitLab MR (см.
+    // src/lib/pr-mr-status.ts) - там X-Proxy-Target выставляется отдельно, не
+    // через этот клиент.
     if (!tauri && proxyUrl) {
-      headers["X-Redmine-Target"] = baseUrl;
+      headers["X-Proxy-Target"] = baseUrl;
     }
     return headers;
   }
