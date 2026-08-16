@@ -41,3 +41,7 @@ tauri-plugin-process = "2"
 # OS push-уведомления (issue #3) - назначение задачи, смена статуса,
 # активность по наблюдаемым задачам, приближение дедлайна.
 tauri-plugin-notification = "2"
+# Открытие ссылок в системном браузере (issue #24) - обычный
+# `<a target="_blank">` в Tauri webview его не открывает, нужен отдельный
+# плагин с shell-open командой.
+tauri-plugin-opener = "2"

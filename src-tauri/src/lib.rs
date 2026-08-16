@@ -18,6 +18,9 @@ pub fn run() {
     // OS push-уведомления (GitHub issue #3) - desktop-only, как остальные
     // плагины выше.
     .plugin(tauri_plugin_notification::init())
+    // Открытие ссылок ("Открыть в Redmine") в системном браузере, а не
+    // внутри webview - GitHub issue #24.
+    .plugin(tauri_plugin_opener::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
