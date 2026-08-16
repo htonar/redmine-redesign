@@ -24,6 +24,46 @@ export const FIELD_LABELS: Record<string, string> = {
   child_id: "Подзадача",
 };
 
+/**
+ * Карты id -> имя для полей journal.details, где Redmine REST API отдает
+ * сырой числовой id вместо названия (status_id/priority_id/tracker_id/
+ * fixed_version_id/category_id/assigned_to_id/project_id). Опциональные -
+ * строятся из уже загруженных на странице справочников (useIssueStatuses,
+ * useTrackers, useIssuePriorities, useProjectCategories, useProjectVersions,
+ * useProjectMembers); поле без карты (например parent_id/child_id - ссылка
+ * на другую задачу) остается как есть - тянуть тему связанной задачи ради
+ * истории не оправдано (N+1).
+ */
+export type JournalValueMaps = Partial<
+  Record<
+    | "status_id"
+    | "priority_id"
+    | "tracker_id"
+    | "fixed_version_id"
+    | "category_id"
+    | "assigned_to_id"
+    | "project_id",
+    Record<number, string>
+  >
+>;
+
+/**
+ * Резолвит одно значение (old_value/new_value) из journal.details в
+ * человекочитаемое имя, если для этого поля есть карта id -> имя и id в ней
+ * найден. Иначе - возвращает значение как есть (в т.ч. "—" для null),
+ * это fallback, не баг.
+ */
+export function resolveJournalFieldValue(
+  name: string,
+  value: string | null,
+  maps: JournalValueMaps,
+): string {
+  if (value === null) return "—";
+  const map = maps[name as keyof JournalValueMaps];
+  if (!map) return value;
+  return map[Number(value)] ?? value;
+}
+
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString("ru-RU", {
     day: "2-digit",
