@@ -1,18 +1,25 @@
 import { useEffect, useState } from "react";
 import type { RedmineClient } from "@/api/client";
-import { search, type SearchResult } from "@/api/search";
+import { searchWithExactIssueMatch, type SearchResult } from "@/api/search";
 
 const DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
 
-/** Поиск по мере ввода для Topbar - debounce, не гоняет запрос на каждый символ. */
+/**
+ * Поиск по мере ввода для Topbar - debounce, не гоняет запрос на каждый
+ * символ. Порог в 2 символа - только для текстового поиска: номер задачи
+ * естественно вводить и одной цифрой (см. useIssueSearch, та же логика), для
+ * чисто числового ввода ищем с первого символа.
+ */
 export function useGlobalSearch(client: RedmineClient | null, query: string) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const trimmed = query.trim();
-    if (!client || trimmed.length < MIN_QUERY_LENGTH) {
+    const isNumericSoFar = /^\d+$/.test(trimmed);
+    const minLength = isNumericSoFar ? 1 : MIN_QUERY_LENGTH;
+    if (!client || trimmed.length < minLength) {
       setResults([]);
       setIsLoading(false);
       return;
@@ -22,7 +29,7 @@ export function useGlobalSearch(client: RedmineClient | null, query: string) {
     setIsLoading(true);
 
     const timer = setTimeout(() => {
-      search(client, trimmed)
+      searchWithExactIssueMatch(client, trimmed)
         .then((data) => {
           if (cancelled) return;
           setResults(data);
