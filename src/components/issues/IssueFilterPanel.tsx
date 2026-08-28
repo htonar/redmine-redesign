@@ -111,6 +111,7 @@ export function IssueFilterPanel({
                 <span className="flex items-center gap-2">
                   <UserAvatar
                     name={o.name}
+                    userId={o.id}
                     email={o.mail}
                     className="size-5"
                   />

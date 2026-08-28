@@ -1,28 +1,55 @@
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 import { getGravatarUrl } from "@/lib/gravatar";
 import { avatarColorClass, initialsFromName } from "@/lib/user-display";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
   name: string;
-  /** Если известен - подставляем Gravatar, при 404 откат на инициалы. */
+  /** id пользователя в Redmine - для аватарки из плагина redmine_people. */
+  userId?: number;
+  /** Email - для Gravatar (fallback, если аватарки из плагина нет). */
   email?: string;
-  /** Классы для размера, напр. "size-5". */
+  /** Классы размера, напр. "size-5". */
   className?: string;
 }
 
 /**
- * Аватарка пользователя для списков/пикеров (issue #44). Gravatar - только
- * если передан email (в большинстве мест REST Redmine его не отдаёт),
- * иначе цветной кружок с инициалами. Цвет детерминирован по имени.
+ * Аватарка пользователя для списков/пикеров (issue #44). Пробуем по очереди:
+ * 1) картинку из плагина redmine_people (`/people/avatar?id=<uid>` - самый
+ *    распространённый плагин аватарок; на инстансах без него 404 -> следующий);
+ * 2) Gravatar по email (если email удалось подтянуть);
+ * 3) цветной кружок с инициалами (цвет детерминирован по имени).
  */
-export function UserAvatar({ name, email, className }: UserAvatarProps) {
+export function UserAvatar({ name, userId, email, className }: UserAvatarProps) {
+  const { baseUrl } = useAuth();
+
+  const sources: string[] = [];
+  if (baseUrl && userId) {
+    sources.push(`${baseUrl}/people/avatar?id=${userId}&size=64`);
+  }
+  if (email) sources.push(getGravatarUrl(email, 64));
+
+  const [srcIdx, setSrcIdx] = useState(0);
+  const key = sources.join("|");
+  useEffect(() => setSrcIdx(0), [key]);
+
+  const src = sources[srcIdx];
+
   return (
     <Avatar size="sm" className={cn("shrink-0", className)}>
-      {email && <AvatarImage src={getGravatarUrl(email, 48)} alt="" />}
-      <AvatarFallback
-        className={cn("font-medium", avatarColorClass(name))}
-      >
+      {src && (
+        <AvatarImage
+          key={src}
+          src={src}
+          alt=""
+          onLoadingStatusChange={(status) => {
+            if (status === "error") setSrcIdx((i) => i + 1);
+          }}
+        />
+      )}
+      <AvatarFallback className={cn("font-medium", avatarColorClass(name))}>
         {initialsFromName(name)}
       </AvatarFallback>
     </Avatar>
