@@ -926,327 +926,370 @@ export function IssueDetailPage() {
             onOpenChange={(open) => !open && setPreviewAttachment(null)}
           />
 
-          {isEditing && editValues ? (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>Правка задачи</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <IssueFormFields
-                  values={editValues}
-                  onChange={updateEditField}
-                  trackers={trackers}
-                  priorities={priorities}
-                  members={members}
-                  categories={categories}
-                  versions={versions}
-                  subjectRequired
-                  client={client}
-                  onDescriptionUpload={(f) =>
-                    setPendingDescriptionUploads((prev) => [...prev, f])
-                  }
-                />
-
-                {editError && (
-                  <Alert variant="destructive" className="mt-3">
-                    <AlertDescription>{editError}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="mt-4 flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleSaveEdit}
-                    disabled={isSavingEdit}
-                  >
-                    {isSavingEdit && (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    )}
-                    Сохранить
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleCancelEdit}
-                    disabled={isSavingEdit}
-                  >
-                    Отмена
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <Card>
-                <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                  <Field label="Проект">
-                    {issue.project ? (
-                      <Link to="/issues" className="hover:underline">
-                        {issue.project.name}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </Field>
-                  <Field label="Автор">{issue.author?.name ?? "—"}</Field>
-                  <Field label="Исполнитель">
-                    {issue.assigned_to?.name ?? "—"}
-                  </Field>
-                  <Field label="Категория">{issue.category?.name ?? "—"}</Field>
-                  <Field label="Версия">
-                    {issue.fixed_version?.name ?? "—"}
-                  </Field>
-                  <Field label="Начало">
-                    {issue.start_date ? formatDate(issue.start_date) : "—"}
-                  </Field>
-                  <Field label="Срок">
-                    {issue.due_date ? formatDate(issue.due_date) : "—"}
-                  </Field>
-                  <Field label="Обновлено">
-                    {formatDateTime(issue.updated_on)}
-                  </Field>
-                  <Field label="Оценка">
-                    {issue.estimated_hours != null
-                      ? `${issue.estimated_hours} ч`
-                      : "—"}
-                  </Field>
-                  <Field label="Потрачено">
-                    {issue.spent_hours != null
-                      ? `${issue.spent_hours.toFixed(2)} ч`
-                      : "—"}
-                  </Field>
-                  {(issue.custom_fields ?? []).map((f) => (
-                    <Field key={f.id} label={f.name}>
-                      {formatCustomFieldValue(f, customFieldDefinitions)}
-                    </Field>
-                  ))}
-                  <div className="col-span-2 sm:col-span-3 lg:col-span-4">
-                    <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Готовность</span>
-                      <span>{issue.done_ratio}%</span>
-                    </div>
-                    <Progress value={issue.done_ratio} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {issue.description && (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+            <div className="flex min-w-0 flex-col gap-4">
+              {isEditing && editValues ? (
                 <Card>
                   <CardHeader className="border-b">
-                    <CardTitle>Описание</CardTitle>
+                    <CardTitle>Правка задачи</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <MarkdownContent
-                      text={issue.description}
-                      attachments={issue.attachments}
+                    <IssueFormFields
+                      values={editValues}
+                      onChange={updateEditField}
+                      trackers={trackers}
+                      priorities={priorities}
+                      members={members}
+                      categories={categories}
+                      versions={versions}
+                      subjectRequired
                       client={client}
+                      onDescriptionUpload={(f) =>
+                        setPendingDescriptionUploads((prev) => [...prev, f])
+                      }
                     />
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
 
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle>Подзадачи и связи</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5">
-              <div>
-                <div className="mb-1.5 text-xs text-muted-foreground">
-                  Родительская задача
-                </div>
-                {issue.parent?.id ? (
-                  <div className="flex items-center gap-2">
-                    <Link
-                      to={`/issues/${issue.parent.id}`}
-                      className="text-sm hover:underline"
-                    >
-                      #{issue.parent.id} —{" "}
-                      {relatedSummaries[issue.parent.id]?.subject ?? "..."}
-                    </Link>
-                    {can("edit_issues", projectId) && (
+                    {editError && (
+                      <Alert variant="destructive" className="mt-3">
+                        <AlertDescription>{editError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="mt-4 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleSaveEdit}
+                        disabled={isSavingEdit}
+                      >
+                        {isSavingEdit && (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        )}
+                        Сохранить
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
-                        onClick={handleClearParent}
-                        disabled={isSavingParent}
-                        aria-label="Убрать родительскую задачу"
+                        onClick={handleCancelEdit}
+                        disabled={isSavingEdit}
                       >
-                        <X className="size-3.5" />
+                        Отмена
                       </Button>
-                    )}
-                  </div>
-                ) : !can("edit_issues", projectId) ? (
-                  <EmptyState size="compact" title="Нет" />
-                ) : isEditingParent ? (
-                  <div className="flex items-center gap-2">
-                    <IssuePicker
-                      client={client}
-                      value={parentInput}
-                      onChange={setParentInput}
-                      projectId={projectId}
-                      className="w-56"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleSetParent}
-                      disabled={isSavingParent}
-                    >
-                      {isSavingParent && (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      )}
-                      Указать
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setIsEditingParent(false);
-                        setParentInput(null);
-                        setParentError(null);
-                      }}
-                      disabled={isSavingParent}
-                    >
-                      Отмена
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => setIsEditingParent(true)}
-                  >
-                    <Plus className="size-3.5" />
-                    Указать родителя
-                  </Button>
-                )}
-                {parentError && (
-                  <p className="mt-1 text-xs text-destructive">{parentError}</p>
-                )}
-              </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                issue.description && (
+                  <Card>
+                    <CardHeader className="border-b">
+                      <CardTitle>Описание</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <MarkdownContent
+                        text={issue.description}
+                        attachments={issue.attachments}
+                        client={client}
+                      />
+                    </CardContent>
+                  </Card>
+                )
+              )}
 
-              <div>
-                <div className="mb-1.5 text-xs text-muted-foreground">
-                  Подзадачи
-                </div>
-                {issue.children && issue.children.length > 0 ? (
-                  <ul className="flex flex-col gap-1.5">
-                    {issue.children.map((c, i) => (
-                      <li
-                        key={c.id ?? i}
-                        className="flex items-center justify-between gap-2"
-                      >
+              <Card>
+                <CardHeader className="border-b">
+                  <CardTitle>Подзадачи и связи</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-5">
+                  <div>
+                    <div className="mb-1.5 text-xs text-muted-foreground">
+                      Родительская задача
+                    </div>
+                    {issue.parent?.id ? (
+                      <div className="flex items-center gap-2">
                         <Link
-                          to={`/issues/${c.id}`}
+                          to={`/issues/${issue.parent.id}`}
                           className="text-sm hover:underline"
                         >
-                          #{c.id} — {c.subject ?? "—"}
+                          #{issue.parent.id} —{" "}
+                          {relatedSummaries[issue.parent.id]?.subject ?? "..."}
                         </Link>
                         {can("edit_issues", projectId) && (
                           <Button
                             size="sm"
                             variant="ghost"
                             className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
-                            onClick={() =>
-                              c.id != null && handleRemoveChild(c.id)
-                            }
-                            disabled={
-                              c.id == null || removingChildId === c.id
-                            }
-                            aria-label="Отвязать подзадачу"
+                            onClick={handleClearParent}
+                            disabled={isSavingParent}
+                            aria-label="Убрать родительскую задачу"
                           >
-                            {removingChildId === c.id ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <X className="size-3.5" />
-                            )}
+                            <X className="size-3.5" />
                           </Button>
                         )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <EmptyState size="compact" title="Нет" />
-                )}
-                {can("edit_issues", projectId) && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <IssuePicker
-                      client={client}
-                      value={childInput}
-                      onChange={setChildInput}
-                      projectId={projectId}
-                      className="w-56"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={handleAddChild}
-                      disabled={isAddingChild}
-                    >
-                      {isAddingChild && (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      )}
-                      <Plus className="size-3.5" />
-                      Добавить подзадачу
-                    </Button>
-                  </div>
-                )}
-                {childError && (
-                  <p className="mt-1 text-xs text-destructive">{childError}</p>
-                )}
-              </div>
-
-              <div>
-                <div className="mb-1.5 text-xs text-muted-foreground">
-                  Связанные задачи
-                </div>
-                {issue.relations && issue.relations.length > 0 ? (
-                  <ul className="flex flex-col gap-1.5">
-                    {issue.relations.map((r, i) => {
-                      const type = r.relation_type ?? "relates";
-                      const isForward = r.issue_id === issue.id;
-                      const otherId = isForward ? r.issue_to_id : r.issue_id;
-                      const label = describeIssueRelation(type, isForward);
-                      const otherSummary =
-                        otherId != null ? relatedSummaries[otherId] : undefined;
-                      return (
-                        <li
-                          key={r.id ?? i}
-                          className="flex items-center justify-between gap-2"
+                      </div>
+                    ) : !can("edit_issues", projectId) ? (
+                      <EmptyState size="compact" title="Нет" />
+                    ) : isEditingParent ? (
+                      <div className="flex items-center gap-2">
+                        <IssuePicker
+                          client={client}
+                          value={parentInput}
+                          onChange={setParentInput}
+                          projectId={projectId}
+                          className="w-56"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleSetParent}
+                          disabled={isSavingParent}
                         >
-                          <span className="text-sm">
-                            <span className="text-muted-foreground">
-                              {label}:
-                            </span>{" "}
-                            {otherId != null ? (
-                              <Link
-                                to={`/issues/${otherId}`}
-                                className="hover:underline"
+                          {isSavingParent && (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          )}
+                          Указать
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setIsEditingParent(false);
+                            setParentInput(null);
+                            setParentError(null);
+                          }}
+                          disabled={isSavingParent}
+                        >
+                          Отмена
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => setIsEditingParent(true)}
+                      >
+                        <Plus className="size-3.5" />
+                        Указать родителя
+                      </Button>
+                    )}
+                    {parentError && (
+                      <p className="mt-1 text-xs text-destructive">{parentError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-1.5 text-xs text-muted-foreground">
+                      Подзадачи
+                    </div>
+                    {issue.children && issue.children.length > 0 ? (
+                      <ul className="flex flex-col gap-1.5">
+                        {issue.children.map((c, i) => (
+                          <li
+                            key={c.id ?? i}
+                            className="flex items-center justify-between gap-2"
+                          >
+                            <Link
+                              to={`/issues/${c.id}`}
+                              className="text-sm hover:underline"
+                            >
+                              #{c.id} — {c.subject ?? "—"}
+                            </Link>
+                            {can("edit_issues", projectId) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                                onClick={() =>
+                                  c.id != null && handleRemoveChild(c.id)
+                                }
+                                disabled={
+                                  c.id == null || removingChildId === c.id
+                                }
+                                aria-label="Отвязать подзадачу"
                               >
-                                #{otherId} — {otherSummary?.subject ?? "..."}
-                              </Link>
-                            ) : (
-                              "—"
+                                {removingChildId === c.id ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <X className="size-3.5" />
+                                )}
+                              </Button>
                             )}
-                          </span>
-                          {can("manage_issue_relations", projectId) && (
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <EmptyState size="compact" title="Нет" />
+                    )}
+                    {can("edit_issues", projectId) && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <IssuePicker
+                          client={client}
+                          value={childInput}
+                          onChange={setChildInput}
+                          projectId={projectId}
+                          className="w-56"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={handleAddChild}
+                          disabled={isAddingChild}
+                        >
+                          {isAddingChild && (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          )}
+                          <Plus className="size-3.5" />
+                          Добавить подзадачу
+                        </Button>
+                      </div>
+                    )}
+                    {childError && (
+                      <p className="mt-1 text-xs text-destructive">{childError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-1.5 text-xs text-muted-foreground">
+                      Связанные задачи
+                    </div>
+                    {issue.relations && issue.relations.length > 0 ? (
+                      <ul className="flex flex-col gap-1.5">
+                        {issue.relations.map((r, i) => {
+                          const type = r.relation_type ?? "relates";
+                          const isForward = r.issue_id === issue.id;
+                          const otherId = isForward ? r.issue_to_id : r.issue_id;
+                          const label = describeIssueRelation(type, isForward);
+                          const otherSummary =
+                            otherId != null ? relatedSummaries[otherId] : undefined;
+                          return (
+                            <li
+                              key={r.id ?? i}
+                              className="flex items-center justify-between gap-2"
+                            >
+                              <span className="text-sm">
+                                <span className="text-muted-foreground">
+                                  {label}:
+                                </span>{" "}
+                                {otherId != null ? (
+                                  <Link
+                                    to={`/issues/${otherId}`}
+                                    className="hover:underline"
+                                  >
+                                    #{otherId} — {otherSummary?.subject ?? "..."}
+                                  </Link>
+                                ) : (
+                                  "—"
+                                )}
+                              </span>
+                              {can("manage_issue_relations", projectId) && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
+                                  onClick={() =>
+                                    r.id != null && handleRemoveRelation(r.id)
+                                  }
+                                  disabled={
+                                    r.id == null || removingRelationId === r.id
+                                  }
+                                  aria-label="Удалить связь"
+                                >
+                                  {removingRelationId === r.id ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <X className="size-3.5" />
+                                  )}
+                                </Button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <EmptyState size="compact" title="Нет" />
+                    )}
+                    {can("manage_issue_relations", projectId) && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Select
+                          value={relationType}
+                          onValueChange={(v) =>
+                            setRelationType(v as IssueRelationType)
+                          }
+                        >
+                          <SelectTrigger className="w-44">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RELATION_TYPE_OPTIONS.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <IssuePicker
+                          client={client}
+                          value={relationInput}
+                          onChange={setRelationInput}
+                          projectId={projectId}
+                          className="w-56"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={handleAddRelation}
+                          disabled={isAddingRelation}
+                        >
+                          {isAddingRelation && (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          )}
+                          <Plus className="size-3.5" />
+                          Добавить связь
+                        </Button>
+                      </div>
+                    )}
+                    {relationError && (
+                      <p className="mt-1 text-xs text-destructive">
+                        {relationError}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="border-b">
+                  <CardTitle>Вложения</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  {issue.attachments && issue.attachments.length > 0 ? (
+                    <ul className="flex flex-col gap-2">
+                      {issue.attachments.map((a) => (
+                        <li
+                          key={a.id}
+                          className="flex items-center justify-between gap-2 text-sm"
+                        >
+                          <button
+                            type="button"
+                            className="flex min-w-0 items-center gap-1.5 text-left hover:underline"
+                            onClick={() => setPreviewAttachment(a)}
+                          >
+                            <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                            <span className="truncate">{a.filename}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              ({formatFileSize(a.filesize)})
+                            </span>
+                          </button>
+                          {can("edit_issues", projectId) && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-6 px-1.5 text-muted-foreground hover:text-destructive"
-                              onClick={() =>
-                                r.id != null && handleRemoveRelation(r.id)
-                              }
-                              disabled={
-                                r.id == null || removingRelationId === r.id
-                              }
-                              aria-label="Удалить связь"
+                              className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveAttachment(a.id)}
+                              disabled={removingAttachmentId === a.id}
+                              aria-label="Удалить файл"
                             >
-                              {removingRelationId === r.id ? (
+                              {removingAttachmentId === a.id ? (
                                 <Loader2 className="size-3.5 animate-spin" />
                               ) : (
                                 <X className="size-3.5" />
@@ -1254,357 +1297,319 @@ export function IssueDetailPage() {
                             </Button>
                           )}
                         </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <EmptyState size="compact" title="Нет" />
-                )}
-                {can("manage_issue_relations", projectId) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Select
-                      value={relationType}
-                      onValueChange={(v) =>
-                        setRelationType(v as IssueRelationType)
-                      }
-                    >
-                      <SelectTrigger className="w-44">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {RELATION_TYPE_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <IssuePicker
-                      client={client}
-                      value={relationInput}
-                      onChange={setRelationInput}
-                      projectId={projectId}
-                      className="w-56"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={handleAddRelation}
-                      disabled={isAddingRelation}
-                    >
-                      {isAddingRelation && (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      )}
-                      <Plus className="size-3.5" />
-                      Добавить связь
-                    </Button>
-                  </div>
-                )}
-                {relationError && (
-                  <p className="mt-1 text-xs text-destructive">
-                    {relationError}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle>Вложения</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              {issue.attachments && issue.attachments.length > 0 ? (
-                <ul className="flex flex-col gap-2">
-                  {issue.attachments.map((a) => (
-                    <li
-                      key={a.id}
-                      className="flex items-center justify-between gap-2 text-sm"
-                    >
-                      <button
-                        type="button"
-                        className="flex min-w-0 items-center gap-1.5 text-left hover:underline"
-                        onClick={() => setPreviewAttachment(a)}
-                      >
-                        <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{a.filename}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          ({formatFileSize(a.filesize)})
-                        </span>
-                      </button>
-                      {can("edit_issues", projectId) && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemoveAttachment(a.id)}
-                          disabled={removingAttachmentId === a.id}
-                          aria-label="Удалить файл"
-                        >
-                          {removingAttachmentId === a.id ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <X className="size-3.5" />
-                          )}
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState size="compact" title="Нет" />
-              )}
-              {(can("edit_issues", projectId) ||
-                can("add_issue_notes", projectId)) && (
-                <div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileInputChange}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploadingFile}
-                  >
-                    {isUploadingFile ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Plus className="size-3.5" />
-                    )}
-                    Прикрепить файл
-                  </Button>
-                  {attachmentError && (
-                    <p className="mt-1 text-xs text-destructive">
-                      {attachmentError}
-                    </p>
+                      ))}
+                    </ul>
+                  ) : (
+                    <EmptyState size="compact" title="Нет" />
                   )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex items-center justify-between border-b">
-              <CardTitle>Наблюдатели</CardTitle>
-              {user &&
-                (() => {
-                  const isSelfWatching =
-                    issue.watchers?.some((w) => w.id === user.id) ?? false;
-                  return (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => handleToggleSelfWatch(isSelfWatching)}
-                      disabled={isTogglingSelfWatch}
-                    >
-                      {isTogglingSelfWatch ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : isSelfWatching ? (
-                        <EyeOff className="size-3.5" />
-                      ) : (
-                        <Eye className="size-3.5" />
+                  {(can("edit_issues", projectId) ||
+                    can("add_issue_notes", projectId)) && (
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileInputChange}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingFile}
+                      >
+                        {isUploadingFile ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="size-3.5" />
+                        )}
+                        Прикрепить файл
+                      </Button>
+                      {attachmentError && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {attachmentError}
+                        </p>
                       )}
-                      {isSelfWatching ? "Не наблюдать" : "Наблюдать"}
-                    </Button>
-                  );
-                })()}
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              {issue.watchers && issue.watchers.length > 0 ? (
-                <ul className="flex flex-col gap-1.5">
-                  {issue.watchers.map((w) => (
-                    <li
-                      key={w.id}
-                      className="flex items-center justify-between gap-2"
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between border-b">
+                  <CardTitle>История и комментарии</CardTitle>
+                  {isAiConfigured(loadAiSettings()) && (
+                    <Popover
+                      onOpenChange={(open) => {
+                        // Не перезапрашиваем при повторном открытии, если уже
+                        // есть результат (или запрос уже летит) - иначе каждое
+                        // открытие popover тратит лишний запрос к AI-провайдеру.
+                        // Ошибку допускаем повторить - мало ли, сеть/лимит
+                        // временные.
+                        if (open && tldrState.status !== "loading" && tldrState.status !== "success") {
+                          handleTldr();
+                        }
+                      }}
                     >
-                      <span className="text-sm">{w.name}</span>
-                      {(w.id === user?.id ||
-                        can("delete_issue_watchers", projectId)) && (
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          {tldrState.status === "loading" ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="size-4" />
+                          )}
+                          TL;DR
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent>
+                        {tldrState.status === "loading" && (
+                          <p className="text-muted-foreground">Суммаризирую...</p>
+                        )}
+                        {tldrState.status === "success" && <p>{tldrState.text}</p>}
+                        {tldrState.status === "error" && (
+                          <p className="text-destructive">{tldrState.message}</p>
+                        )}
+                        {tldrState.status === "idle" && (
+                          <p className="text-muted-foreground">Суммаризирую...</p>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex flex-col">
+                    {issue.journals && issue.journals.length > 0 ? (
+                      issue.journals.map((j) => (
+                        <JournalEntry
+                          key={j.id}
+                          journal={j}
+                          customFieldNames={customFieldNames}
+                          valueMaps={journalValueMaps}
+                          attachments={issue.attachments}
+                          client={client}
+                        />
+                      ))
+                    ) : (
+                      <p className="py-2 text-sm text-muted-foreground">
+                        Пока пусто
+                      </p>
+                    )}
+                  </div>
+
+                  {can("add_issue_notes", projectId) && (
+                    <div className="flex flex-col gap-2 border-t border-border pt-3">
+                      <MarkdownEditor
+                        client={client}
+                        placeholder="Добавить комментарий..."
+                        value={comment}
+                        onChange={setComment}
+                        onUpload={(f) =>
+                          setPendingCommentUploads((prev) => [...prev, f])
+                        }
+                        onSubmitShortcut={handleAddComment}
+                        rows={3}
+                      />
+                      <Button
+                        size="sm"
+                        className="w-fit"
+                        disabled={!comment.trim() || isSavingComment}
+                        onClick={handleAddComment}
+                      >
+                        {isSavingComment && (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        )}
+                        Добавить
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            <div className="flex min-w-0 flex-col gap-4">
+              {!isEditing && (
+                  <Card>
+                    <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-1">
+                      <Field label="Проект">
+                        {issue.project ? (
+                          <Link to="/issues" className="hover:underline">
+                            {issue.project.name}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </Field>
+                      <Field label="Автор">{issue.author?.name ?? "—"}</Field>
+                      <Field label="Исполнитель">
+                        {issue.assigned_to?.name ?? "—"}
+                      </Field>
+                      <Field label="Категория">{issue.category?.name ?? "—"}</Field>
+                      <Field label="Версия">
+                        {issue.fixed_version?.name ?? "—"}
+                      </Field>
+                      <Field label="Начало">
+                        {issue.start_date ? formatDate(issue.start_date) : "—"}
+                      </Field>
+                      <Field label="Срок">
+                        {issue.due_date ? formatDate(issue.due_date) : "—"}
+                      </Field>
+                      <Field label="Обновлено">
+                        {formatDateTime(issue.updated_on)}
+                      </Field>
+                      <Field label="Оценка">
+                        {issue.estimated_hours != null
+                          ? `${issue.estimated_hours} ч`
+                          : "—"}
+                      </Field>
+                      <Field label="Потрачено">
+                        {issue.spent_hours != null
+                          ? `${issue.spent_hours.toFixed(2)} ч`
+                          : "—"}
+                      </Field>
+                      {(issue.custom_fields ?? []).map((f) => (
+                        <Field key={f.id} label={f.name}>
+                          {formatCustomFieldValue(f, customFieldDefinitions)}
+                        </Field>
+                      ))}
+                      <div className="col-span-2 sm:col-span-3 lg:col-span-1">
+                        <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Готовность</span>
+                          <span>{issue.done_ratio}%</span>
+                        </div>
+                        <Progress value={issue.done_ratio} />
+                      </div>
+                    </CardContent>
+                  </Card>
+              )}
+
+              <Card>
+                <CardHeader className="flex items-center justify-between border-b">
+                  <CardTitle>Наблюдатели</CardTitle>
+                  {user &&
+                    (() => {
+                      const isSelfWatching =
+                        issue.watchers?.some((w) => w.id === user.id) ?? false;
+                      return (
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemoveWatcher(w.id)}
-                          disabled={removingWatcherId === w.id}
-                          aria-label="Убрать наблюдателя"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => handleToggleSelfWatch(isSelfWatching)}
+                          disabled={isTogglingSelfWatch}
                         >
-                          {removingWatcherId === w.id ? (
+                          {isTogglingSelfWatch ? (
                             <Loader2 className="size-3.5 animate-spin" />
+                          ) : isSelfWatching ? (
+                            <EyeOff className="size-3.5" />
                           ) : (
-                            <X className="size-3.5" />
+                            <Eye className="size-3.5" />
                           )}
+                          {isSelfWatching ? "Не наблюдать" : "Наблюдать"}
                         </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState size="compact" title="Нет" />
-              )}
-              {can("add_issue_watchers", projectId) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Select value={watcherInput} onValueChange={setWatcherInput}>
-                    <SelectTrigger className="w-56">
-                      <SelectValue placeholder="Участник проекта" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {members
-                        .filter(
-                          (m) => !issue.watchers?.some((w) => w.id === m.id),
-                        )
-                        .map((m) => (
-                          <SelectItem key={m.id} value={String(m.id)}>
-                            {m.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => handleAddWatcher(Number(watcherInput))}
-                    disabled={!watcherInput || isAddingWatcher}
-                  >
-                    {isAddingWatcher && (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    )}
-                    <Plus className="size-3.5" />
-                    Добавить наблюдателя
-                  </Button>
-                </div>
-              )}
-              {watcherError && (
-                <p className="text-xs text-destructive">{watcherError}</p>
-              )}
-            </CardContent>
-          </Card>
+                      );
+                    })()}
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  {issue.watchers && issue.watchers.length > 0 ? (
+                    <ul className="flex flex-col gap-1.5">
+                      {issue.watchers.map((w) => (
+                        <li
+                          key={w.id}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <span className="text-sm">{w.name}</span>
+                          {(w.id === user?.id ||
+                            can("delete_issue_watchers", projectId)) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveWatcher(w.id)}
+                              disabled={removingWatcherId === w.id}
+                              aria-label="Убрать наблюдателя"
+                            >
+                              {removingWatcherId === w.id ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <X className="size-3.5" />
+                              )}
+                            </Button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <EmptyState size="compact" title="Нет" />
+                  )}
+                  {can("add_issue_watchers", projectId) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select value={watcherInput} onValueChange={setWatcherInput}>
+                        <SelectTrigger className="w-56">
+                          <SelectValue placeholder="Участник проекта" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {members
+                            .filter(
+                              (m) => !issue.watchers?.some((w) => w.id === m.id),
+                            )
+                            .map((m) => (
+                              <SelectItem key={m.id} value={String(m.id)}>
+                                {m.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => handleAddWatcher(Number(watcherInput))}
+                        disabled={!watcherInput || isAddingWatcher}
+                      >
+                        {isAddingWatcher && (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        )}
+                        <Plus className="size-3.5" />
+                        Добавить наблюдателя
+                      </Button>
+                    </div>
+                  )}
+                  {watcherError && (
+                    <p className="text-xs text-destructive">{watcherError}</p>
+                  )}
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="flex items-center justify-between border-b">
-              <CardTitle>Время</CardTitle>
-              {can("log_time", projectId) && (
-              <LogTimeDialog
-                client={client}
-                projects={projects}
-                activities={activities}
-                defaultProjectId={issue.project?.id}
-                defaultIssueId={issue.id}
-                onSubmit={handleLogTime}
-                trigger={
-                  <Button size="sm" variant="outline" className="gap-1.5">
-                    <Plus className="size-3.5" />
-                    Залогировать время
-                  </Button>
-                }
-              />
-              )}
-            </CardHeader>
-            <CardContent>
-              <span className="text-sm text-muted-foreground">
-                Потрачено всего:{" "}
-                {issue.spent_hours != null
-                  ? `${issue.spent_hours.toFixed(2)} ч`
-                  : "0 ч"}
-              </span>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between border-b">
-              <CardTitle>История и комментарии</CardTitle>
-              {isAiConfigured(loadAiSettings()) && (
-                <Popover
-                  onOpenChange={(open) => {
-                    // Не перезапрашиваем при повторном открытии, если уже
-                    // есть результат (или запрос уже летит) - иначе каждое
-                    // открытие popover тратит лишний запрос к AI-провайдеру.
-                    // Ошибку допускаем повторить - мало ли, сеть/лимит
-                    // временные.
-                    if (open && tldrState.status !== "loading" && tldrState.status !== "success") {
-                      handleTldr();
-                    }
-                  }}
-                >
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      {tldrState.status === "loading" ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="size-4" />
-                      )}
-                      TL;DR
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    {tldrState.status === "loading" && (
-                      <p className="text-muted-foreground">Суммаризирую...</p>
-                    )}
-                    {tldrState.status === "success" && <p>{tldrState.text}</p>}
-                    {tldrState.status === "error" && (
-                      <p className="text-destructive">{tldrState.message}</p>
-                    )}
-                    {tldrState.status === "idle" && (
-                      <p className="text-muted-foreground">Суммаризирую...</p>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              )}
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <div className="flex flex-col">
-                {issue.journals && issue.journals.length > 0 ? (
-                  issue.journals.map((j) => (
-                    <JournalEntry
-                      key={j.id}
-                      journal={j}
-                      customFieldNames={customFieldNames}
-                      valueMaps={journalValueMaps}
-                      attachments={issue.attachments}
-                      client={client}
-                    />
-                  ))
-                ) : (
-                  <p className="py-2 text-sm text-muted-foreground">
-                    Пока пусто
-                  </p>
-                )}
-              </div>
-
-              {can("add_issue_notes", projectId) && (
-                <div className="flex flex-col gap-2 border-t border-border pt-3">
-                  <MarkdownEditor
+              <Card>
+                <CardHeader className="flex items-center justify-between border-b">
+                  <CardTitle>Время</CardTitle>
+                  {can("log_time", projectId) && (
+                  <LogTimeDialog
                     client={client}
-                    placeholder="Добавить комментарий..."
-                    value={comment}
-                    onChange={setComment}
-                    onUpload={(f) =>
-                      setPendingCommentUploads((prev) => [...prev, f])
+                    projects={projects}
+                    activities={activities}
+                    defaultProjectId={issue.project?.id}
+                    defaultIssueId={issue.id}
+                    onSubmit={handleLogTime}
+                    trigger={
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        <Plus className="size-3.5" />
+                        Залогировать время
+                      </Button>
                     }
-                    onSubmitShortcut={handleAddComment}
-                    rows={3}
                   />
-                  <Button
-                    size="sm"
-                    className="w-fit"
-                    disabled={!comment.trim() || isSavingComment}
-                    onClick={handleAddComment}
-                  >
-                    {isSavingComment && (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    )}
-                    Добавить
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <span className="text-sm text-muted-foreground">
+                    Потрачено всего:{" "}
+                    {issue.spent_hours != null
+                      ? `${issue.spent_hours.toFixed(2)} ч`
+                      : "0 ч"}
+                  </span>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </>
       )}
     </div>
