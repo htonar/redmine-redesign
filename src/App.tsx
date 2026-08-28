@@ -11,6 +11,7 @@ import { ProfilePage } from "@/pages/ProfilePage";
 import { FilesPage } from "@/pages/FilesPage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { SearchPage } from "@/pages/SearchPage";
 
 function AppGate() {
   const { status } = useAuth();
@@ -39,6 +40,7 @@ function AppGate() {
         <Route path="/files" element={<FilesPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route
           path="/integrations"
           element={<Navigate to="/settings" replace />}
