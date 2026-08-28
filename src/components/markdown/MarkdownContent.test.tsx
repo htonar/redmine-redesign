@@ -96,6 +96,28 @@ describe("MarkdownContent", () => {
     expect(imgs[1]).toHaveAttribute("src", "https://example.com/x.png");
   });
 
+  it("рендерит Textile-картинку `!name!` как <img> с blob-URL вложения", () => {
+    const { container } = render(
+      <MarkdownContent
+        text="скрин: !clipboard-1.png!"
+        extraMedia={{ "clipboard-1.png": { url: "blob:c1", kind: "image" } }}
+      />,
+    );
+    expect(container.querySelector("img")).toHaveAttribute("src", "blob:c1");
+  });
+
+  it("Textile `!{width: 680px}.name!` -> <img> с шириной 680px", () => {
+    const { container } = render(
+      <MarkdownContent
+        text="!{width: 680px}.pic.png!"
+        extraMedia={{ "pic.png": { url: "blob:p", kind: "image" } }}
+      />,
+    );
+    const img = container.querySelector("img")!;
+    expect(img).toHaveAttribute("src", "blob:p");
+    expect(img.style.width).toBe("680px");
+  });
+
   it("не дублирует чип при повторной ссылке на тот же PR", () => {
     render(
       <MarkdownContent
