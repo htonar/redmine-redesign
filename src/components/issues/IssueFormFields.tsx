@@ -314,6 +314,7 @@ export function IssueFormFields({
                 <span className="flex items-center gap-2">
                   <UserAvatar
                     name={m.name}
+                    userId={m.id}
                     email={m.mail}
                     className="size-5"
                   />
