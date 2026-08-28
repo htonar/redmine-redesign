@@ -21,6 +21,8 @@ import {
   Pencil,
   Plus,
   Sparkles,
+  Square,
+  Timer,
   Trash2,
   X,
 } from "lucide-react";
@@ -92,6 +94,8 @@ import {
 } from "@/lib/issue-relations";
 import { dueDateState, priorityBadgeClass } from "@/lib/issue-visuals";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
+import { formatDuration } from "@/lib/format-duration";
+import { useLayoutContext } from "./AppLayout";
 import { cn, formatFileSize } from "@/lib/utils";
 import { celebrate } from "@/lib/celebrate";
 import { diffFormValues, formatCustomFieldValue } from "@/lib/issue-form";
@@ -179,6 +183,8 @@ export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { client, can, user, baseUrl } = useAuth();
+  const { startTimer, stopTimer, activeTimerIssueId, activeTimerElapsedMs } =
+    useLayoutContext();
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
   const issueId = id ? Number(id) : null;
@@ -922,6 +928,40 @@ export function IssueDetailPage() {
                   }
                 />
               )}
+              {can("log_time", projectId) &&
+                (activeTimerIssueId === issue.id ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 font-mono tabular-nums"
+                    onClick={stopTimer}
+                  >
+                    <Square className="size-3 fill-current" />
+                    {formatDuration(activeTimerElapsedMs)}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={activeTimerIssueId !== null}
+                    title={
+                      activeTimerIssueId !== null
+                        ? `Таймер уже идёт по #${activeTimerIssueId}`
+                        : undefined
+                    }
+                    onClick={() =>
+                      startTimer({
+                        issueId: issue.id,
+                        issueSubject: issue.subject,
+                        projectId: issue.project?.id ?? null,
+                      })
+                    }
+                  >
+                    <Timer className="size-3.5" />
+                    Таймер
+                  </Button>
+                ))}
               {/* Второстепенные и деструктивные действия - в "…"-меню (issue
                   #61), чтобы "Удалить" не стояло вплотную к частым кнопкам. */}
               <DropdownMenu>
