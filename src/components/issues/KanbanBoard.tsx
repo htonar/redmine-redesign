@@ -23,6 +23,10 @@ import { useIssueStatuses } from "@/hooks/useIssueStatuses";
 import { useKanbanIssues } from "@/hooks/useKanbanIssues";
 import { updateIssue, type IssueSummary } from "@/api/issues";
 import type { RedmineClient } from "@/api/client";
+import {
+  sortStatusesByOrder,
+  type KanbanColumnPrefs,
+} from "@/lib/kanban-columns";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", {
@@ -172,6 +176,8 @@ export interface KanbanBoardProps {
   projectId: number;
   assignee: "me" | "all";
   canEdit: boolean;
+  /** Какие статус-колонки показывать и в каком порядке (см. useKanbanColumnPrefs). */
+  columnPrefs: KanbanColumnPrefs;
 }
 
 /**
@@ -189,6 +195,7 @@ export function KanbanBoard({
   projectId,
   assignee,
   canEdit,
+  columnPrefs,
 }: KanbanBoardProps) {
   const navigate = useNavigate();
   const { statuses, isLoading: statusesLoading } = useIssueStatuses(client);
@@ -213,11 +220,16 @@ export function KanbanBoard({
       list.push(issue);
       byStatus.set(issue.status.id, list);
     }
-    return statuses.map((s) => ({
-      status: s,
-      issues: byStatus.get(s.id) ?? [],
-    }));
-  }, [statuses, issues]);
+    const hidden = new Set(columnPrefs.hidden);
+    return sortStatusesByOrder(statuses, columnPrefs.order)
+      .filter((s) => !hidden.has(s.id))
+      .map((s) => ({ status: s, issues: byStatus.get(s.id) ?? [] }));
+  }, [statuses, issues, columnPrefs]);
+
+  const hiddenIssueCount = useMemo(() => {
+    const hidden = new Set(columnPrefs.hidden);
+    return issues.filter((i) => i.status && hidden.has(i.status.id)).length;
+  }, [issues, columnPrefs.hidden]);
 
   function handleDragStart(event: DragStartEvent) {
     const issue = issues.find((i) => i.id === Number(event.active.id));
@@ -354,6 +366,11 @@ export function KanbanBoard({
           Показаны первые {issues.length} из {totalCount} - сузьте фильтр
           (например, "Мои задачи"), если нужны остальные; доска не подгружает
           страницами.
+        </p>
+      )}
+      {hiddenIssueCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {hiddenIssueCount} задач в скрытых колонках - см. «Колонки».
         </p>
       )}
       {!hasMore && issues.length === 0 && (
