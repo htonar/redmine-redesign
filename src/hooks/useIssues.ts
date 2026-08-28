@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { RedmineClient } from "@/api/client";
 import { listIssues, type IssueListFilters, type IssueSummary } from "@/api/issues";
 
@@ -15,6 +15,7 @@ export function useIssues(client: RedmineClient | null, filters: IssueListFilter
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const filtersKey = JSON.stringify(filters);
 
@@ -44,7 +45,9 @@ export function useIssues(client: RedmineClient | null, filters: IssueListFilter
     };
     // filters сравниваются через filtersKey ниже
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, filtersKey]);
+  }, [client, filtersKey, reloadToken]);
+
+  const reload = useCallback(() => setReloadToken((t) => t + 1), []);
 
   async function loadMore() {
     if (!client || isLoadingMore) return;
@@ -84,5 +87,6 @@ export function useIssues(client: RedmineClient | null, filters: IssueListFilter
     hasMore: issues.length < totalCount,
     loadMore,
     patchIssue,
+    reload,
   };
 }
