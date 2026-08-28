@@ -240,7 +240,7 @@ export function IssueDetailPage() {
 
   // TL;DR обсуждения через AI-ассистент (issue #23) - эфемерный результат,
   // не персистится. Кнопка видна только если AI настроен в /profile ->
-  // "Интеграции" (см. IntegrationsPage.tsx).
+  // "Настройки" (см. SettingsPage.tsx).
   type TldrState =
     | { status: "idle" }
     | { status: "loading" }

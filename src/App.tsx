@@ -10,7 +10,7 @@ import { TimeTrackingPage } from "@/pages/TimeTrackingPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { FilesPage } from "@/pages/FilesPage";
 import { ReportsPage } from "@/pages/ReportsPage";
-import { IntegrationsPage } from "@/pages/IntegrationsPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 function AppGate() {
   const { status } = useAuth();
@@ -38,7 +38,11 @@ function AppGate() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/files" element={<FilesPage />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/integrations" element={<IntegrationsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/integrations"
+          element={<Navigate to="/settings" replace />}
+        />
         <Route path="*" element={<Navigate to="/issues" replace />} />
       </Route>
     </Routes>
