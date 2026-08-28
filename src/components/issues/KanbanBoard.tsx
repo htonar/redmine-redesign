@@ -135,7 +135,7 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2",
+        "flex h-full w-[85vw] max-w-80 shrink-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2 sm:w-72",
         isOver && "border-primary bg-primary/5",
       )}
     >
@@ -304,7 +304,7 @@ export function KanbanBoard({
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2"
+            className="flex h-full w-[85vw] max-w-80 shrink-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2 sm:w-72"
           >
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-20 w-full" />
