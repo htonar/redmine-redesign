@@ -16,7 +16,8 @@ export function ActivityFeed({ entries, valueMaps }: ActivityFeedProps) {
   if (entries.length === 0) {
     return (
       <p className="px-4 py-4 text-sm text-muted-foreground">
-        За последнее время изменений по вашим задачам не найдено
+        Пока тихо - здесь появятся комментарии и изменения по задачам, которые
+        назначены на вас или за которыми вы наблюдаете.
       </p>
     );
   }

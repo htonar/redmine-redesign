@@ -34,15 +34,34 @@ export function useActivityFeed(client: RedmineClient | null, projectId?: number
     setIsLoading(true);
     setError(null);
 
-    listIssues(client, {
-      projectId,
-      assignee: "me",
-      status: "all",
-      sort: "updated_on:desc",
-      offset: 0,
-      limit: RECENT_ISSUES_LIMIT,
-    })
-      .then(async ({ issues }) => {
+    Promise.all([
+      listIssues(client, {
+        projectId,
+        assignee: "me",
+        status: "all",
+        sort: "updated_on:desc",
+        offset: 0,
+        limit: RECENT_ISSUES_LIMIT,
+      }),
+      listIssues(client, {
+        projectId,
+        assignee: "all",
+        watcher: "me",
+        status: "all",
+        sort: "updated_on:desc",
+        offset: 0,
+        limit: RECENT_ISSUES_LIMIT,
+      }).catch(() => ({ issues: [] })),
+    ])
+      .then(async ([mine, watched]) => {
+        // Свои + наблюдаемые, без дублей, снова по свежести обновления.
+        const byId = new Map<number, (typeof mine.issues)[number]>();
+        for (const issue of [...mine.issues, ...watched.issues]) {
+          if (!byId.has(issue.id)) byId.set(issue.id, issue);
+        }
+        const issues = Array.from(byId.values())
+          .sort((a, b) => (a.updated_on < b.updated_on ? 1 : -1))
+          .slice(0, RECENT_ISSUES_LIMIT);
         // Одна упавшая задача не должна ронять всю ленту - пропускаем её.
         const perIssue = await Promise.all(
           issues.map((issue) => getIssueJournal(client, issue.id).catch(() => null)),

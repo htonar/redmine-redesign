@@ -27,15 +27,9 @@ import { useIssueStatuses } from "@/hooks/useIssueStatuses";
 import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { useTrackers } from "@/hooks/useTrackers";
 import type { JournalValueMaps } from "@/lib/journal-format";
+import { statusBadgeClass } from "@/lib/issue-visuals";
+import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 import { useLayoutContext } from "./AppLayout";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 interface Counts {
   myOpen: number;
@@ -207,13 +201,19 @@ export function DashboardPage() {
                     </TableCell>
                     <TableCell>
                       {issue.status && (
-                        <Badge variant={issue.status.is_closed ? "secondary" : "default"}>
+                        <Badge
+                          variant="outline"
+                          className={statusBadgeClass(issue.status)}
+                        >
                           {issue.status.name}
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(issue.updated_on)}
+                    <TableCell
+                      className="text-muted-foreground"
+                      title={fullTimestamp(issue.updated_on)}
+                    >
+                      {formatRelativeTime(issue.updated_on)}
                     </TableCell>
                   </TableRow>
                 ))}

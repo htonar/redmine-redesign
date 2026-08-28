@@ -28,13 +28,11 @@ import {
   type KanbanColumnPrefs,
 } from "@/lib/kanban-columns";
 import { useListKeyboardNav } from "@/hooks/useListKeyboardNav";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-  });
-}
+import {
+  priorityBadgeClass,
+  statusBadgeClass,
+} from "@/lib/issue-visuals";
+import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 
 interface KanbanCardProps {
   issue: IssueSummary;
@@ -106,7 +104,10 @@ function KanbanCard({ issue, draggable, onOpen, active }: KanbanCardProps) {
         <div className="line-clamp-2 font-medium">{issue.subject}</div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {issue.priority?.name && (
-            <Badge variant="outline" className="text-[11px]">
+            <Badge
+              variant="outline"
+              className={cn("text-[11px]", priorityBadgeClass(issue.priority.name))}
+            >
               {issue.priority.name}
             </Badge>
           )}
@@ -116,8 +117,11 @@ function KanbanCard({ issue, draggable, onOpen, active }: KanbanCardProps) {
             </span>
           )}
         </div>
-        <div className="mt-1 text-[11px] text-muted-foreground">
-          обновлено {formatDate(issue.updated_on)}
+        <div
+          className="mt-1 text-[11px] text-muted-foreground"
+          title={fullTimestamp(issue.updated_on)}
+        >
+          обновлено {formatRelativeTime(issue.updated_on)}
         </div>
       </button>
     </div>
@@ -156,7 +160,12 @@ function KanbanColumn({
     >
       <div className="flex shrink-0 items-center justify-between gap-2 px-1 pt-1">
         <div className="flex items-center gap-1.5">
-          <Badge variant={isClosed ? "secondary" : "default"}>{title}</Badge>
+          <Badge
+            variant="outline"
+            className={statusBadgeClass({ name: title, is_closed: isClosed })}
+          >
+            {title}
+          </Badge>
         </div>
         <span className="text-xs text-muted-foreground">{issues.length}</span>
       </div>

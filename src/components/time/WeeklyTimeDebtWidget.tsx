@@ -32,7 +32,15 @@ interface DayBarProps {
 function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime }: DayBarProps) {
   // Выходной: нормы нет, столбик нейтральный, "+" не показываем.
   const met = !day.isFuture && !day.isWeekend && day.deficit === 0;
-  const fillPct = day.isFuture ? 0 : Math.min(100, (day.hoursLogged / DAILY_TARGET_HOURS) * 100);
+  const rawPct = day.isFuture
+    ? 0
+    : Math.min(100, (day.hoursLogged / DAILY_TARGET_HOURS) * 100);
+  // Минимальная видимая полоска для прошедшего буднего дня с почти нулевым
+  // логом - иначе столбик выглядит сломанным, а не "ничего не затрекано".
+  const fillPct =
+    !day.isFuture && !day.isWeekend && rawPct < 4 ? 4 : rawPct;
+  const showAddButton =
+    !day.isFuture && !day.isWeekend && day.deficit > 0 && projects.length > 0;
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -84,26 +92,30 @@ function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime
         {day.isFuture ? "—" : `${day.hoursLogged.toFixed(1)}ч`}
       </div>
 
-      {!day.isFuture && !day.isWeekend && day.deficit > 0 && projects.length > 0 && (
-        <LogTimeDialog
-          client={client}
-          projects={projects}
-          activities={activities}
-          defaultProjectId={defaultProjectId}
-          defaultSpentOn={day.date}
-          onSubmit={onLogTime}
-          trigger={
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="size-5"
-              aria-label={`Залогировать время за ${day.date}`}
-            >
-              <Plus className="size-3" />
-            </Button>
-          }
-        />
-      )}
+      {/* Слот под "+" фиксированной высоты всегда - иначе колонки с кнопкой
+          выше остальных и вся строка (flex items-end) едет по вертикали. */}
+      <div className="flex h-5 items-center">
+        {showAddButton && (
+          <LogTimeDialog
+            client={client}
+            projects={projects}
+            activities={activities}
+            defaultProjectId={defaultProjectId}
+            defaultSpentOn={day.date}
+            onSubmit={onLogTime}
+            trigger={
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="size-5"
+                aria-label={`Залогировать время за ${day.date}`}
+              >
+                <Plus className="size-3" />
+              </Button>
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }
