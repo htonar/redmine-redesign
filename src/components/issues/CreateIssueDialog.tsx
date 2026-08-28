@@ -117,6 +117,9 @@ export function CreateIssueDialog({
   const [values, setValues] = useState<IssueFormValues>(EMPTY_VALUES);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // #42 - последняя созданная через "Создать и ещё" задача (диалог остаётся
+  // открытым, показываем подтверждение со ссылкой).
+  const [lastCreated, setLastCreated] = useState<IssueSummary | null>(null);
   // Файлы, вставленные по Ctrl+V в описание, пока задачи ещё не существует -
   // токены отправятся вместе с созданием задачи (см. handleSubmit). См.
   // CLAUDE.md, "Markdown-редактор".
@@ -173,6 +176,7 @@ export function CreateIssueDialog({
     setValues(EMPTY_VALUES);
     setFormError(null);
     setPendingUploads([]);
+    setLastCreated(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -251,9 +255,10 @@ export function CreateIssueDialog({
     });
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e: FormEvent | undefined, andAnother = false) {
+    e?.preventDefault();
     setFormError(null);
+    setLastCreated(null);
 
     if (!projectId) {
       setFormError("Выберите проект.");
@@ -301,8 +306,25 @@ export function CreateIssueDialog({
     setIsSubmitting(true);
     try {
       const issue = await createIssue(client!, input);
-      setOpen(false);
-      onCreated(issue);
+      if (andAnother) {
+        // Оставляем диалог открытым, чистим только тему/описание/сроки -
+        // проект/трекер/приоритет/исполнитель/версия остаются для серии
+        // однотипных задач.
+        setValues((v) => ({
+          ...v,
+          subject: "",
+          description: "",
+          startDate: "",
+          dueDate: "",
+          doneRatio: 0,
+          estimatedHours: "",
+        }));
+        setPendingUploads([]);
+        setLastCreated(issue);
+      } else {
+        setOpen(false);
+        onCreated(issue);
+      }
     } catch (err) {
       setFormError(
         err instanceof Error ? err.message : "Не удалось создать задачу.",
@@ -423,7 +445,34 @@ export function CreateIssueDialog({
             </Alert>
           )}
 
-          <DialogFooter>
+          {lastCreated && (
+            <p className="text-sm text-emerald-600">
+              Создана{" "}
+              <button
+                type="button"
+                className="font-medium underline"
+                onClick={() => {
+                  const created = lastCreated;
+                  setOpen(false);
+                  onCreated(created);
+                }}
+              >
+                #{lastCreated.id}
+              </button>{" "}
+              «{lastCreated.subject}». Форма готова к следующей.
+            </p>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() => void handleSubmit(undefined, true)}
+            >
+              {isSubmitting && <Loader2 className="size-3.5 animate-spin" />}
+              Создать и ещё
+            </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="size-3.5 animate-spin" />}
               Создать
