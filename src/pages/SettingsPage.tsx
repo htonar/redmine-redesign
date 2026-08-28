@@ -29,14 +29,17 @@ import {
 } from "@/lib/ai-settings-storage";
 
 /**
- * Токены GitHub/GitLab для живого статуса PR/MR-чипов - см. issue #22,
- * шаг 2. Только client-side (localStorage), сервер их не видит и не хранит -
- * тот же принцип, что и у Redmine API-ключа (см. src/pages/LoginPage.tsx).
- * Один токен на платформу, не на хост - осознанное ограничение из грилинга:
- * self-hosted GitHub Enterprise и github.com одновременно делить один токен
- * не смогут.
+ * Настройки приложения - всё, что хранится только в этом браузере
+ * (localStorage), не в Redmine: токены GitHub/GitLab для живого статуса
+ * PR/MR-чипов (issue #22), ключ AI-ассистента (issue #23), шаблон имени
+ * ветки (issue #27). Раньше называлось "Интеграции", но имя ветки - не
+ * интеграция, так что раздел общий: "Настройки".
+ *
+ * Токен GitHub/GitLab - один на платформу, не на хост: self-hosted
+ * Enterprise и github.com одновременно делить один токен не смогут
+ * (осознанное ограничение из грилинга).
  */
-export function IntegrationsPage() {
+export function SettingsPage() {
   const [tokens, setTokens] = useState<IntegrationTokens>(() => loadIntegrationTokens());
   const [isEditing, setIsEditing] = useState(false);
   const [values, setValues] = useState<IntegrationTokens>(tokens);
@@ -105,12 +108,23 @@ export function IntegrationsPage() {
   const [branchCfg, setBranchCfg] = useState<BranchNameConfig>(() =>
     loadBranchNameConfig(),
   );
+  const [isEditingBranch, setIsEditingBranch] = useState(false);
   const [branchTemplate, setBranchTemplate] = useState(branchCfg.template);
   const [branchUseAi, setBranchUseAi] = useState(branchCfg.useAi);
   const [branchTypeMapText, setBranchTypeMapText] = useState(() =>
     formatTypeMap(branchCfg.typeMap),
   );
-  const [branchSaved, setBranchSaved] = useState(false);
+
+  function startEditingBranch() {
+    setBranchTemplate(branchCfg.template);
+    setBranchUseAi(branchCfg.useAi);
+    setBranchTypeMapText(formatTypeMap(branchCfg.typeMap));
+    setIsEditingBranch(true);
+  }
+
+  function cancelEditingBranch() {
+    setIsEditingBranch(false);
+  }
 
   function handleSaveBranch() {
     const next: BranchNameConfig = {
@@ -120,11 +134,10 @@ export function IntegrationsPage() {
     };
     saveBranchNameConfig(next);
     setBranchCfg(next);
-    setBranchTemplate(next.template);
-    setBranchTypeMapText(formatTypeMap(next.typeMap));
-    setBranchSaved(true);
-    setTimeout(() => setBranchSaved(false), 2000);
+    setIsEditingBranch(false);
   }
+
+  const branchRuleCount = Object.keys(branchCfg.typeMap).length;
 
   return (
     <div className="flex max-w-xl flex-col gap-4">
@@ -272,8 +285,13 @@ export function IntegrationsPage() {
       </Card>
 
       <Card>
-        <CardHeader className="border-b">
+        <CardHeader className="flex flex-row items-center justify-between border-b">
           <CardTitle>Имя ветки</CardTitle>
+          {!isEditingBranch && (
+            <Button variant="outline" size="sm" onClick={startEditingBranch}>
+              Редактировать
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">
@@ -286,58 +304,83 @@ export function IntegrationsPage() {
             <code className="text-xs">{"{project}"}</code>.
           </p>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="branch-template">Шаблон</Label>
-            <Input
-              id="branch-template"
-              value={branchTemplate}
-              placeholder={DEFAULT_BRANCH_TEMPLATE}
-              onChange={(e) => setBranchTemplate(e.target.value)}
-            />
-          </div>
+          {isEditingBranch ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="branch-template">Шаблон</Label>
+                <Input
+                  id="branch-template"
+                  value={branchTemplate}
+                  placeholder={DEFAULT_BRANCH_TEMPLATE}
+                  onChange={(e) => setBranchTemplate(e.target.value)}
+                />
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="branch-type-map">
-              Префикс по трекеру (по строке{" "}
-              <code className="text-xs">трекер=префикс</code>)
-            </Label>
-            <Textarea
-              id="branch-type-map"
-              rows={4}
-              className="font-mono text-xs"
-              value={branchTypeMapText}
-              placeholder={"bug=fix\nбаг=fix"}
-              onChange={(e) => setBranchTypeMapText(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Трекер, которого нет в списке, даёт префикс{" "}
-              <code className="text-xs">feature</code>.
-            </p>
-          </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="branch-type-map">
+                  Префикс по трекеру (по строке{" "}
+                  <code className="text-xs">трекер=префикс</code>)
+                </Label>
+                <Textarea
+                  id="branch-type-map"
+                  rows={4}
+                  className="font-mono text-xs"
+                  value={branchTypeMapText}
+                  placeholder={"bug=fix\nбаг=fix"}
+                  onChange={(e) => setBranchTypeMapText(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Трекер, которого нет в списке, даёт префикс{" "}
+                  <code className="text-xs">feature</code>.
+                </p>
+              </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <Label htmlFor="branch-use-ai">AI для англоязычного slug</Label>
-              <p className="text-xs text-muted-foreground">
-                {isAiConfigured
-                  ? "Тема задачи уходит настроенному AI-провайдеру; при ошибке - транслитерация."
-                  : "Сначала настройте AI-ассистента выше."}
-              </p>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="branch-use-ai">AI для англоязычного slug</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {isAiConfigured
+                      ? "Тема задачи уходит настроенному AI-провайдеру; при ошибке - транслитерация."
+                      : "Сначала настройте AI-ассистента выше."}
+                  </p>
+                </div>
+                <Switch
+                  id="branch-use-ai"
+                  checked={branchUseAi && isAiConfigured}
+                  disabled={!isAiConfigured}
+                  onCheckedChange={setBranchUseAi}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleSaveBranch}>Сохранить</Button>
+                <Button variant="outline" onClick={cancelEditingBranch}>
+                  Отмена
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <div className="text-xs text-muted-foreground">Шаблон</div>
+                <code className="text-sm">{branchCfg.template}</code>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  AI для slug
+                </div>
+                <div className="text-sm">
+                  {branchCfg.useAi && isAiConfigured ? "Включён" : "Выключен"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Правил префикса по трекеру
+                </div>
+                <div className="text-sm">{branchRuleCount}</div>
+              </div>
             </div>
-            <Switch
-              id="branch-use-ai"
-              checked={branchUseAi && isAiConfigured}
-              disabled={!isAiConfigured}
-              onCheckedChange={setBranchUseAi}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button onClick={handleSaveBranch}>Сохранить</Button>
-            {branchSaved && (
-              <span className="text-sm text-emerald-600">Сохранено</span>
-            )}
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

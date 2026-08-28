@@ -1,4 +1,4 @@
-import { BarChart3, Clock, Folder, Link2, PencilLine, PieChart, User, type LucideIcon } from 'lucide-react'
+import { BarChart3, Clock, Folder, PencilLine, PieChart, Settings, User, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   id: string
@@ -22,5 +22,5 @@ export const navItems: NavItem[] = [
   { id: 'tasks', label: 'Задачи', icon: PencilLine, path: '/issues' },
   { id: 'files', label: 'Файлы', icon: Folder, path: '/files' },
   { id: 'reports', label: 'Отчеты', icon: PieChart, path: '/reports' },
-  { id: 'integrations', label: 'Интеграции', icon: Link2, path: '/integrations' },
+  { id: 'settings', label: 'Настройки', icon: Settings, path: '/settings' },
 ]
