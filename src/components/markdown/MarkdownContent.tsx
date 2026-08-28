@@ -4,7 +4,10 @@ import remarkGfm from "remark-gfm";
 import type { RedmineClient } from "@/api/client";
 import type { Attachment } from "@/api/attachments";
 import { Badge } from "@/components/ui/badge";
-import { useAttachmentImageUrls } from "@/components/markdown/useAttachmentImageUrls";
+import {
+  useAttachmentMediaUrls,
+  type ResolvedMedia,
+} from "@/components/markdown/useAttachmentMediaUrls";
 import { usePrMrStatuses } from "@/hooks/usePrMrStatuses";
 import { extractPrMrLinks } from "@/lib/pr-mr-links";
 import type { PrMrStatus } from "@/lib/pr-mr-status";
@@ -37,9 +40,15 @@ const PR_MR_STATUS_CLASS: Record<PrMrStatus, string> = {
 
 export interface MarkdownContentProps {
   text: string;
-  /** Для резолва `![](filename)`, ссылающихся на прикреплённые к задаче картинки - см. useAttachmentImageUrls. */
+  /** Для резолва `![](filename)`, ссылающихся на прикреплённые к задаче медиа - см. useAttachmentMediaUrls. */
   attachments?: Attachment[];
   client?: RedmineClient | null;
+  /**
+   * Дополнительные медиа по имени файла - для предпросмотра в редакторе, где
+   * файл ещё не прикреплён к задаче (только что вставлен по Ctrl+V), но blob
+   * уже есть локально. Имеет приоритет над резолвом из attachments.
+   */
+  extraMedia?: Record<string, ResolvedMedia>;
   className?: string;
 }
 
@@ -59,9 +68,11 @@ export function MarkdownContent({
   text,
   attachments,
   client,
+  extraMedia,
   className,
 }: MarkdownContentProps) {
-  const imageUrls = useAttachmentImageUrls(client ?? null, attachments);
+  const attachmentMedia = useAttachmentMediaUrls(client ?? null, attachments);
+  const media = { ...attachmentMedia, ...extraMedia };
   const prMrLinks = extractPrMrLinks(text);
   const prMrStatuses = usePrMrStatuses(prMrLinks);
 
@@ -79,11 +90,22 @@ export function MarkdownContent({
           remarkPlugins={[remarkGfm]}
           components={{
             img: ({ src, alt }) => {
-              const resolved =
-                typeof src === "string" && imageUrls[src] ? imageUrls[src] : src;
+              const hit = typeof src === "string" ? media[src] : undefined;
+              if (hit?.kind === "video") {
+                return (
+                  <video
+                    src={hit.url}
+                    controls
+                    className="max-w-full rounded-lg border border-border"
+                  />
+                );
+              }
+              if (hit?.kind === "audio") {
+                return <audio src={hit.url} controls className="w-full" />;
+              }
               return (
                 <img
-                  src={resolved}
+                  src={hit?.url ?? src}
                   alt={alt ?? ""}
                   className="rounded-lg border border-border"
                 />
