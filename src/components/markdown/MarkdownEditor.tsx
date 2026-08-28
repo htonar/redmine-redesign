@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bold,
   Code,
@@ -14,8 +14,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
+import {
+  mediaKind,
+  type ResolvedMedia,
+} from "@/components/markdown/useAttachmentMediaUrls";
 import { uploadAttachment, type UploadedFile } from "@/api/attachments";
 import type { RedmineClient } from "@/api/client";
+import {
+  extractClipboardFiles,
+  GENERIC_PASTE_NAME,
+  renameFile,
+  uniquePasteName,
+} from "@/lib/clipboard-files";
 import { cn } from "@/lib/utils";
 
 interface ToolbarAction {
@@ -101,7 +111,20 @@ export function MarkdownEditor({
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // blob-URL только что вставленных по Ctrl+V медиа - чтобы предпросмотр
+  // показывал их сразу, до того как форма сохранена и файл стал вложением
+  // задачи (иначе в предпросмотре была бы битая ссылка).
+  const [pastedMedia, setPastedMedia] = useState<Record<string, ResolvedMedia>>(
+    {},
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    return () => {
+      for (const { url } of Object.values(pastedMedia)) URL.revokeObjectURL(url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function applyWrap(action: ToolbarAction) {
     const el = textareaRef.current;
@@ -127,13 +150,26 @@ export function MarkdownEditor({
     setUploadError(null);
     setIsUploading(true);
     try {
-      for (const file of files) {
+      for (const rawFile of files) {
+        // Картинка из системного буфера почти всегда приходит с именем
+        // "image.png" - несколько вставок подряд затирали бы друг друга
+        // (Redmine и наш рендер резолвят `![](имя)` по имени файла). Даём
+        // таким файлам уникальное имя.
+        const file = GENERIC_PASTE_NAME.test(rawFile.name)
+          ? renameFile(rawFile, uniquePasteName(rawFile))
+          : rawFile;
         const uploaded = await uploadAttachment(client, file);
         onUpload?.(uploaded);
-        const isImage = file.type.startsWith("image/");
-        const markdown = isImage
+        const kind = mediaKind(file.type);
+        // `![](имя)` для любого медиа (картинка/видео/аудио) - MarkdownContent
+        // выберет тег по типу вложения; `[имя](имя)` - для прочих файлов.
+        const markdown = kind
           ? `![${file.name}](${file.name})`
           : `[${file.name}](${file.name})`;
+        if (kind) {
+          const url = URL.createObjectURL(file);
+          setPastedMedia((prev) => ({ ...prev, [file.name]: { url, kind } }));
+        }
         const el = textareaRef.current;
         const pos = el ? el.selectionStart : value.length;
         onChange(value.slice(0, pos) + markdown + value.slice(pos));
@@ -148,7 +184,9 @@ export function MarkdownEditor({
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const files = Array.from(e.clipboardData.files);
+    // Не только clipboardData.files: вставленная из буфера картинка приходит
+    // в items как kind:"file", а files при этом пустой (см. extractClipboardFiles).
+    const files = extractClipboardFiles(e.clipboardData);
     if (files.length === 0) return;
     e.preventDefault();
     void handleFiles(files);
@@ -236,7 +274,11 @@ export function MarkdownEditor({
           style={{ minHeight: `${rows * 1.5}rem` }}
         >
           {value.trim() ? (
-            <MarkdownContent text={value} client={client} />
+            <MarkdownContent
+              text={value}
+              client={client}
+              extraMedia={pastedMedia}
+            />
           ) : (
             "Нечего показать"
           )}

@@ -61,6 +61,41 @@ describe("MarkdownContent", () => {
     expect(chip).toHaveClass("bg-violet-600");
   });
 
+  it("рендерит <video> для медиа-вложения типа video через extraMedia", () => {
+    const { container } = render(
+      <MarkdownContent
+        text="![clip.mp4](clip.mp4)"
+        extraMedia={{ "clip.mp4": { url: "blob:vid", kind: "video" } }}
+      />,
+    );
+    const video = container.querySelector("video");
+    expect(video).toBeInTheDocument();
+    expect(video).toHaveAttribute("src", "blob:vid");
+    expect(container.querySelector("img")).not.toBeInTheDocument();
+  });
+
+  it("рендерит <audio> для медиа-вложения типа audio", () => {
+    const { container } = render(
+      <MarkdownContent
+        text="![voice.ogg](voice.ogg)"
+        extraMedia={{ "voice.ogg": { url: "blob:snd", kind: "audio" } }}
+      />,
+    );
+    expect(container.querySelector("audio")).toHaveAttribute("src", "blob:snd");
+  });
+
+  it("рендерит <img> с blob-URL для картинки и обычный src для внешней ссылки", () => {
+    const { container } = render(
+      <MarkdownContent
+        text={"![a.png](a.png)\n\n![ext](https://example.com/x.png)"}
+        extraMedia={{ "a.png": { url: "blob:img", kind: "image" } }}
+      />,
+    );
+    const imgs = container.querySelectorAll("img");
+    expect(imgs[0]).toHaveAttribute("src", "blob:img");
+    expect(imgs[1]).toHaveAttribute("src", "https://example.com/x.png");
+  });
+
   it("не дублирует чип при повторной ссылке на тот же PR", () => {
     render(
       <MarkdownContent
