@@ -1,4 +1,4 @@
-import { ChevronDown, Keyboard, Moon, Sun } from "lucide-react";
+import { ChevronDown, Keyboard, Menu, Moon, Sun } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ export interface TopbarProps {
   onToggleTheme: () => void;
   onShowHotkeysHelp?: () => void;
   notifications: NotificationsBellProps;
+  /** Открыть выезжающий сайдбар на узких экранах (< lg). */
+  onOpenNav?: () => void;
 }
 
 /** Верхняя панель рабочей области: поиск, переключатель проекта, пользователь. */
@@ -50,6 +52,7 @@ export function Topbar({
   onToggleTheme,
   onShowHotkeysHelp,
   notifications,
+  onOpenNav,
 }: TopbarProps) {
   const navigate = useNavigate();
   const updater = useAppUpdater();
@@ -57,22 +60,36 @@ export function Topbar({
     projects.find((p) => p.id === selectedProjectId)?.name ?? "Все проекты";
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4">
-      <div className="w-full max-w-sm">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-3 sm:gap-4 sm:px-4">
+      {onOpenNav && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 lg:hidden"
+          aria-label="Меню"
+          onClick={onOpenNav}
+        >
+          <Menu className="size-5" />
+        </Button>
+      )}
+
+      <div className="min-w-0 flex-1 sm:max-w-sm">
         <GlobalSearch client={client} />
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="gap-1.5"
+              className="max-w-[8rem] gap-1.5 sm:max-w-none"
               disabled={projectsLoading}
             >
-              {projectsLoading ? "Загрузка..." : currentProjectName}
-              <ChevronDown className="size-3.5 text-muted-foreground" />
+              <span className="truncate">
+                {projectsLoading ? "Загрузка..." : currentProjectName}
+              </span>
+              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -97,6 +114,7 @@ export function Topbar({
             variant="ghost"
             size="icon"
             aria-label="Горячие клавиши"
+            className="hidden sm:inline-flex"
             onClick={onShowHotkeysHelp}
           >
             <Keyboard className="size-4" />
@@ -124,7 +142,9 @@ export function Topbar({
               type="button"
               className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-accent"
             >
-              <span className="text-sm font-medium">{user.name}</span>
+              <span className="hidden max-w-[10rem] truncate text-sm font-medium sm:inline">
+                {user.name}
+              </span>
               <Avatar className="size-8">
                 <AvatarImage
                   src={getGravatarUrl(user.email, 64)}

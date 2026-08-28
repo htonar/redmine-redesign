@@ -26,28 +26,29 @@ function isPathActive(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`)
 }
 
+export interface SidebarProps {
+  /** Открыт ли выезжающий drawer на узких экранах (< lg). На lg+ игнорируется. */
+  mobileOpen?: boolean
+  /** Вызывается при переходе по пункту меню - чтобы вызывающий закрыл mobile drawer. */
+  onNavigate?: () => void
+}
+
 /**
- * Темный левый сайдбар с иконками разделов - см. docs/design.md. Пункты без
- * `path` в nav-items.ts еще не реализованы - показаны, но неактивны.
+ * Темный левый сайдбар с иконками разделов - см. docs/design.md.
  *
- * Гамбургер-toggle переключает свернутый (иконки без подписей, w-16) и
- * развернутый (подписи рядом с иконками, w-56) режим - выбор сохраняется в
- * localStorage, по образцу ThemeContext. В развернутом виде подпись уже
- * видна рядом с иконкой, поэтому Tooltip не нужен - показываем его только в
- * свернутом состоянии.
+ * - **lg и шире**: в потоке слева. Гамбургер-toggle переключает свернутый
+ *   (иконки, `w-16`) и развернутый (`w-56`) режим, выбор в localStorage.
+ * - **уже lg**: выезжающий поверх контента drawer (`fixed`, `w-64`), скрыт
+ *   по умолчанию (`-translate-x-full`), открывается `mobileOpen` (гамбургер в
+ *   Topbar). Backdrop и закрытие - на стороне AppShell.
  *
  * Активный пункт вычисляем сами через useLocation(), а не через функцию-пропс
  * NavLink#className - в свернутом состоянии пункт обернут в
  * `TooltipTrigger asChild`, а Radix Slot при мерже пропсов складывает
  * `className` через `[a, b].filter(Boolean).join(" ")`, ожидая строки; если
- * className - функция (как у NavLink по умолчанию), join молча приводит её к
- * строке через toString() - в DOM утекает исходный код функции вместо
- * классов, а подсветка активного пункта перестаёт работать. Это баг,
- * унаследованный от исходного кода (Tooltip оборачивал NavLink с
- * className-функцией и там же), просто раньше не был замечен - подсветка не
- * работала ни в одном состоянии сайдбара.
+ * className - функция, в DOM утекает её исходный код вместо классов.
  */
-export function Sidebar() {
+export function Sidebar({ mobileOpen = false, onNavigate }: SidebarProps) {
   const [expanded, setExpanded] = useState(getInitialExpanded)
   const { pathname } = useLocation()
 
@@ -59,11 +60,22 @@ export function Sidebar() {
     })
   }
 
+  // В drawer-режиме (узкий экран) подписи всегда видны - свёрнутый rail это
+  // десктопная концепция.
+  const showLabels = mobileOpen || expanded
+
   return (
     <aside
       className={cn(
-        'flex h-svh shrink-0 flex-col gap-1 bg-sidebar py-3 text-sidebar-foreground transition-[width] duration-200',
-        expanded ? 'w-56 items-stretch px-2' : 'w-16 items-center',
+        'z-50 flex h-svh shrink-0 flex-col gap-1 bg-sidebar py-3 text-sidebar-foreground',
+        'transition-[width,transform] duration-200',
+        // Мобильный drawer (< lg): фикс поверх контента, выезжает по mobileOpen.
+        'max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-64 max-lg:shadow-xl',
+        mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full',
+        // lg+: в потоке, ширина по expanded.
+        'lg:static lg:translate-x-0',
+        expanded ? 'lg:w-56' : 'lg:w-16',
+        showLabels ? 'items-stretch px-2' : 'items-center',
       )}
     >
       <button
@@ -73,6 +85,8 @@ export function Sidebar() {
         onClick={toggleExpanded}
         className={cn(
           'mb-4 flex size-9 items-center justify-center rounded-lg text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground',
+          // Кнопка сворачивания rail нужна только на lg+ (в drawer он всегда развёрнут).
+          'max-lg:hidden',
           expanded && 'self-start',
         )}
       >
@@ -82,7 +96,7 @@ export function Sidebar() {
       <nav
         className={cn(
           'flex flex-1 flex-col gap-1',
-          expanded ? 'items-stretch' : 'items-center',
+          showLabels ? 'items-stretch' : 'items-center',
         )}
       >
         {navItems.map((item) => {
@@ -91,14 +105,15 @@ export function Sidebar() {
             <NavLink
               to={item.path}
               aria-label={item.label}
+              onClick={() => onNavigate?.()}
               className={cn(
                 itemBaseClasses,
-                expanded ? 'justify-start px-3' : 'w-10 justify-center',
+                showLabels ? 'justify-start px-3' : 'w-10 justify-center',
                 isPathActive(pathname, item.path) ? activeClasses : inactiveClasses,
               )}
             >
               <Icon className="size-5 shrink-0" />
-              {expanded && <span className="truncate text-sm">{item.label}</span>}
+              {showLabels && <span className="truncate text-sm">{item.label}</span>}
             </NavLink>
           ) : (
             <button
@@ -107,16 +122,16 @@ export function Sidebar() {
               disabled
               className={cn(
                 itemBaseClasses,
-                expanded ? 'justify-start px-3' : 'w-10 justify-center',
+                showLabels ? 'justify-start px-3' : 'w-10 justify-center',
                 'text-sidebar-foreground/30',
               )}
             >
               <Icon className="size-5 shrink-0" />
-              {expanded && <span className="truncate text-sm">{item.label}</span>}
+              {showLabels && <span className="truncate text-sm">{item.label}</span>}
             </button>
           )
 
-          if (expanded) {
+          if (showLabels) {
             return <div key={item.id}>{content}</div>
           }
 

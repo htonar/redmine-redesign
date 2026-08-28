@@ -837,7 +837,7 @@ export function IssueDetailPage() {
                 {issue.subject}
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <BranchNameButton
                 issueId={issue.id}
                 subject={issue.subject}
@@ -887,7 +887,7 @@ export function IssueDetailPage() {
                   onValueChange={handleStatusChange}
                   disabled={isSavingStatus}
                 >
-                  <SelectTrigger className="w-44">
+                  <SelectTrigger className="w-40 sm:w-44">
                     <SelectValue placeholder="Статус" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1119,13 +1119,13 @@ export function IssueDetailPage() {
                       <EmptyState size="compact" title="Нет" />
                     )}
                     {can("edit_issues", projectId) && (
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <IssuePicker
                           client={client}
                           value={childInput}
                           onChange={setChildInput}
                           projectId={projectId}
-                          className="w-56"
+                          className="w-full sm:w-56"
                         />
                         <Button
                           size="sm"
@@ -1215,7 +1215,7 @@ export function IssueDetailPage() {
                             setRelationType(v as IssueRelationType)
                           }
                         >
-                          <SelectTrigger className="w-44">
+                          <SelectTrigger className="w-full sm:w-44">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1231,7 +1231,7 @@ export function IssueDetailPage() {
                           value={relationInput}
                           onChange={setRelationInput}
                           projectId={projectId}
-                          className="w-56"
+                          className="w-full sm:w-56"
                         />
                         <Button
                           size="sm"

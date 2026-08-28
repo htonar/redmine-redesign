@@ -184,7 +184,7 @@ export function LogTimeDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor={issueFieldId} className="mb-1.5">
                 Задача
@@ -218,7 +218,7 @@ export function LogTimeDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor={dateFieldId} className="mb-1.5">
                 Дата

@@ -186,7 +186,7 @@ export function IntegrationsPage() {
               </div>
             </>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <div className="text-xs text-muted-foreground">GitHub</div>
                 <div className="text-sm">{tokens.github ? "Токен задан" : "Не задан"}</div>
