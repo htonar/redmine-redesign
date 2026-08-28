@@ -4,6 +4,69 @@ import { getIssueSummary } from "@/api/issues";
 
 export type SearchResult = components["schemas"]["search"];
 
+/**
+ * Тип фильтра для страницы поиска (issue #43). Соответствие "флаг запроса
+ * `/search.json`" -> "значения `type` в результатах".
+ */
+export type SearchTypeFilter =
+  | "all"
+  | "issues"
+  | "projects"
+  | "wiki_pages"
+  | "news"
+  | "documents"
+  | "messages";
+
+export interface SearchPageParams {
+  q: string;
+  offset: number;
+  limit: number;
+  /** "all" - без ограничения по типу; иначе только выбранный тип. */
+  type?: SearchTypeFilter;
+  openIssuesOnly?: boolean;
+}
+
+export interface SearchPageResult {
+  results: SearchResult[];
+  totalCount: number;
+}
+
+/**
+ * Полная страница результатов поиска - GET /search.json с пагинацией
+ * (offset/limit) и счётчиком (total_count). В отличие от `search` выше
+ * (подсказки в Topbar), это отдельный экран.
+ */
+export async function searchPage(
+  client: RedmineClient,
+  params: SearchPageParams,
+): Promise<SearchPageResult> {
+  const typeFlag =
+    params.type && params.type !== "all"
+      ? ({ [params.type]: 1 } as Record<string, 1>)
+      : {};
+  const { data, error } = await client.GET("/search.{format}", {
+    params: {
+      path: { format: "json" },
+      query: {
+        q: params.q,
+        offset: params.offset,
+        limit: params.limit,
+        ...typeFlag,
+        open_issues: params.openIssuesOnly ? "1" : undefined,
+      },
+    },
+  });
+
+  if (error || !data) {
+    throw new Error("Не удалось выполнить поиск.");
+  }
+
+  return {
+    results: data.results,
+    totalCount: data.total_count ?? data.results.length,
+  };
+}
+
 /** Глобальный поиск - GET /search.json. limit небольшой - это подсказки в Topbar, не отдельная страница результатов. */
 export async function search(client: RedmineClient, query: string): Promise<SearchResult[]> {
   const { data, error } = await client.GET("/search.{format}", {

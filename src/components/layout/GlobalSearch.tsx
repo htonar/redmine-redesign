@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -12,26 +12,7 @@ import {
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import type { RedmineClient } from "@/api/client";
 import type { SearchResult } from "@/api/search";
-
-/**
- * Машинные значения `type` в ответе /search.json не задокументированы явно в
- * REST-вики - взяты из практики самого Redmine (app/models/*, где строится
- * поиск). Если встретится незнакомый тип - не гадаем, просто показываем сырое
- * значение (см. typeLabel ниже), не выдумываем неверный перевод.
- */
-const TYPE_LABELS: Record<string, string> = {
-  issue: "Задача",
-  project: "Проект",
-  news: "Новость",
-  document: "Документ",
-  changeset: "Коммит",
-  "wiki-page": "Wiki",
-  message: "Форум",
-};
-
-function typeLabel(type: string): string {
-  return TYPE_LABELS[type] ?? type;
-}
+import { searchTypeLabel } from "@/lib/search-types";
 
 /** id задачи из url результата поиска ("/issues/123") - для перехода на нашу карточку вместо чужой вкладки. */
 function issueIdFromUrl(url: string): number | null {
@@ -57,8 +38,16 @@ export function GlobalSearch({ client }: GlobalSearchProps) {
 
   const showList = isOpen && query.trim().length > 0;
 
+  function goToFullSearch() {
+    const q = query.trim();
+    if (!q) return;
+    navigate(`/search?q=${encodeURIComponent(q)}`);
+    setQuery("");
+    setIsOpen(false);
+  }
+
   function handleSelect(result: SearchResult) {
-    const issueId = result.type === "issue" ? issueIdFromUrl(result.url) : null;
+    const issueId = result.type.startsWith("issue") ? issueIdFromUrl(result.url) : null;
     if (issueId) {
       navigate(`/issues/${issueId}`);
     } else {
@@ -82,6 +71,12 @@ export function GlobalSearch({ client }: GlobalSearchProps) {
         onValueChange={setQuery}
         onFocus={() => setIsOpen(true)}
         onBlur={() => setIsOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            goToFullSearch();
+          }
+        }}
       />
       {showList && (
         <CommandList
@@ -96,7 +91,9 @@ export function GlobalSearch({ client }: GlobalSearchProps) {
               Ищем...
             </div>
           )}
-          {!isLoading && <CommandEmpty>Ничего не найдено</CommandEmpty>}
+          {!isLoading && results.length === 0 && (
+            <CommandEmpty>Ничего не найдено</CommandEmpty>
+          )}
           {!isLoading && results.length > 0 && (
             <CommandGroup>
               {results.map((result) => (
@@ -108,12 +105,24 @@ export function GlobalSearch({ client }: GlobalSearchProps) {
                 >
                   <span className="flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">
-                      {typeLabel(result.type)}
+                      {searchTypeLabel(result.type)}
                     </span>
                     <span className="truncate">{result.title}</span>
                   </span>
                 </CommandItem>
               ))}
+            </CommandGroup>
+          )}
+          {!isLoading && query.trim().length > 0 && (
+            <CommandGroup className="border-t border-border">
+              <CommandItem
+                value="__all_results__"
+                onSelect={goToFullSearch}
+                className="text-sm text-muted-foreground"
+              >
+                <ArrowRight className="size-3.5" />
+                Все результаты для «{query.trim()}»
+              </CommandItem>
             </CommandGroup>
           )}
         </CommandList>
