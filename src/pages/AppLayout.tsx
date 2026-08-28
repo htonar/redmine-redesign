@@ -17,7 +17,10 @@ import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
-import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/notifications";
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  type NotificationSettings,
+} from "@/lib/notifications";
 import { syncTrayBadge } from "@/lib/tray";
 import { createTimeEntry } from "@/api/timeEntries";
 
@@ -27,6 +30,9 @@ const TRAY_LOG_TIME_EVENT = "tray://log-time";
 interface LayoutContext {
   selectedProjectId: number | null;
   setSelectedProjectId: (projectId: number | null) => void;
+  /** Настройки уведомлений - персист на этом уровне, редактируются и из раздела «Настройки» (issue #45). */
+  notificationSettings: NotificationSettings;
+  setNotificationSettings: (next: NotificationSettings) => void;
 }
 
 function initials(firstname: string, lastname: string): string {
@@ -146,7 +152,12 @@ export function AppLayout() {
         >
           <Outlet
             context={
-              { selectedProjectId, setSelectedProjectId } satisfies LayoutContext
+              {
+                selectedProjectId,
+                setSelectedProjectId,
+                notificationSettings,
+                setNotificationSettings,
+              } satisfies LayoutContext
             }
           />
         </ErrorBoundary>

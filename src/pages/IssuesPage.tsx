@@ -65,6 +65,8 @@ import type { IssueListFilters } from "@/api/issues";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import { issueUrl } from "@/lib/redmine-url";
 import { openExternal } from "@/lib/open-external";
+import { cn } from "@/lib/utils";
+import { useListKeyboardNav } from "@/hooks/useListKeyboardNav";
 import { isTauri } from "@tauri-apps/api/core";
 import type { IssueView } from "@/lib/issue-views-storage";
 import { useLayoutContext } from "./AppLayout";
@@ -210,6 +212,13 @@ export function IssuesPage() {
   }, [selectedProjectId, advanced]);
 
   const { field: sortField, dir: sortDir } = parseSort(sort);
+
+  // j/k + Enter по строкам таблицы (issue #46).
+  const { index: navIndex, setActiveRef: setNavActiveRef } = useListKeyboardNav(
+    issues,
+    (issue) => navigate(`/issues/${issue.id}`),
+    layout === "table",
+  );
 
   function toggleSort(field: string) {
     setSort(toggleSortValue(sort, field));
@@ -490,16 +499,20 @@ export function IssuesPage() {
               )}
 
               {!isLoading &&
-                issues.map((issue) => (
+                issues.map((issue, i) => (
                   <TableRow
                     key={issue.id}
+                    ref={i === navIndex ? setNavActiveRef : undefined}
                     // animate-in fade-in-0 - при смене фильтров новые
                     // issue.id монтируются как новые строки и плавно
                     // проявляются (issue #9, "переходы между состояниями
                     // списков при фильтрации"); уже показанные строки не
                     // перемонтируются на каждый рендер, так что анимация не
                     // дёргается зря. motion-reduce - см. index.css.
-                    className="cursor-pointer animate-in fade-in-0 duration-200 motion-reduce:animate-none"
+                    className={cn(
+                      "cursor-pointer animate-in fade-in-0 duration-200 motion-reduce:animate-none",
+                      i === navIndex && "bg-accent",
+                    )}
                     onClick={() => navigate(`/issues/${issue.id}`)}
                   >
                     <TableCell className="text-muted-foreground">

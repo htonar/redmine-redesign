@@ -13,11 +13,13 @@ export interface DayDebt {
   hoursLogged: number;
   isFuture: boolean;
   isToday: boolean;
-  /** Недотрекано (0, если план выполнен или день ещё не наступил). */
+  /** Сб/Вс - нормы нет, в долг не считаются. */
+  isWeekend: boolean;
+  /** Недотрекано (0, если план выполнен, день ещё не наступил или это выходной). */
   deficit: number;
 }
 
-const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт"];
+const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 function toIsoDate(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -34,16 +36,24 @@ function mondayOf(d: Date): Date {
   return monday;
 }
 
+const SHORT_MONTHS = [
+  "янв", "фев", "мар", "апр", "мая", "июн",
+  "июл", "авг", "сен", "окт", "ноя", "дек",
+];
+
 /**
- * Будние дни (Пн-Пт) текущей недели с фактически залогированными часами и
- * "долгом" (сколько еще недотрекано) - конкретный сценарий пользователя:
- * норма 8ч/будний день, но трекается не каждый день, а наверстывается пачкой.
- * Дни после сегодня - `isFuture`, в долг не считаются (рано). Использует тот
- * же `GET /time_entries.json?spent_on=w` (шорткат Redmine "эта неделя"), что
- * и фильтр "Эта неделя" на TimeTrackingPage.
+ * Дни недели с фактически залогированными часами и "долгом" по норме 8ч на
+ * будний день (Пн-Пт). Выходные (Сб/Вс) показываются, если в них есть
+ * залогированное время, но в долг не идут. `weekOffset` - смещение недели
+ * от текущей (0 - эта, -1 - прошлая, +1 - следующая); для offset != 0
+ * запрашиваем явный диапазон дат вместо шортката `w`.
  */
-export function useWeeklyTimeDebt(client: RedmineClient | null) {
+export function useWeeklyTimeDebt(
+  client: RedmineClient | null,
+  weekOffset = 0,
+) {
   const [days, setDays] = useState<DayDebt[]>([]);
+  const [rangeLabel, setRangeLabel] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -57,16 +67,35 @@ export function useWeeklyTimeDebt(client: RedmineClient | null) {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const monday = mondayOf(today);
     const todayIso = toIsoDate(today);
 
-    listTimeEntries(client, { scope: "me", spentOn: "w", offset: 0, limit: 100 })
+    const monday = mondayOf(today);
+    monday.setDate(monday.getDate() + weekOffset * 7);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const mondayIso = toIsoDate(monday);
+    const sundayIso = toIsoDate(sunday);
+
+    setRangeLabel(
+      `${monday.getDate()} ${SHORT_MONTHS[monday.getMonth()]} - ${sunday.getDate()} ${SHORT_MONTHS[sunday.getMonth()]}`,
+    );
+
+    listTimeEntries(client, {
+      scope: "me",
+      from: mondayIso,
+      to: sundayIso,
+      offset: 0,
+      limit: 100,
+    })
       .then(({ entries }) => {
         if (cancelled) return;
 
         const hoursByDate = new Map<string, number>();
         for (const entry of entries) {
-          hoursByDate.set(entry.spent_on, (hoursByDate.get(entry.spent_on) ?? 0) + entry.hours);
+          hoursByDate.set(
+            entry.spent_on,
+            (hoursByDate.get(entry.spent_on) ?? 0) + entry.hours,
+          );
         }
 
         const result: DayDebt[] = WEEKDAY_LABELS.map((label, i) => {
@@ -74,6 +103,7 @@ export function useWeeklyTimeDebt(client: RedmineClient | null) {
           date.setDate(monday.getDate() + i);
           const iso = toIsoDate(date);
           const isFuture = iso > todayIso;
+          const isWeekend = i >= 5;
           const hoursLogged = hoursByDate.get(iso) ?? 0;
           return {
             date: iso,
@@ -81,7 +111,11 @@ export function useWeeklyTimeDebt(client: RedmineClient | null) {
             hoursLogged,
             isFuture,
             isToday: iso === todayIso,
-            deficit: isFuture ? 0 : Math.max(0, DAILY_TARGET_HOURS - hoursLogged),
+            isWeekend,
+            deficit:
+              isFuture || isWeekend
+                ? 0
+                : Math.max(0, DAILY_TARGET_HOURS - hoursLogged),
           };
         });
 
@@ -89,7 +123,11 @@ export function useWeeklyTimeDebt(client: RedmineClient | null) {
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Не удалось загрузить трудозатраты за неделю.");
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Не удалось загрузить трудозатраты за неделю.",
+        );
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -98,8 +136,7 @@ export function useWeeklyTimeDebt(client: RedmineClient | null) {
     return () => {
       cancelled = true;
     };
-    // limit=100 хватает за глаза для недели одного пользователя - пагинация не нужна.
-  }, [client, reloadToken]);
+  }, [client, weekOffset, reloadToken]);
 
   const totalDeficit = days.reduce((sum, d) => sum + d.deficit, 0);
 
@@ -107,5 +144,5 @@ export function useWeeklyTimeDebt(client: RedmineClient | null) {
     setReloadToken((t) => t + 1);
   }
 
-  return { days, totalDeficit, isLoading, error, reload };
+  return { days, totalDeficit, rangeLabel, isLoading, error, reload };
 }

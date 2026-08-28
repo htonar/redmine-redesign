@@ -4,6 +4,13 @@ import type { RedmineClient } from "@/api/client";
 export interface ProjectMember {
   id: number;
   name: string;
+  /**
+   * Email - для Gravatar-аватарки (issue #44). Redmine отдаёт `mail` в
+   * `/users/{id}.json` только админам и самому пользователю, поэтому здесь
+   * best-effort: на не-админской сессии у большинства участников будет
+   * undefined, и аватарка откатится на инициалы.
+   */
+  mail?: string;
 }
 
 /**
@@ -46,7 +53,7 @@ export function useProjectMembers(
       })
       .then(({ data }) => {
         if (cancelled || !data) return;
-        const users = data.memberships
+        const users: ProjectMember[] = data.memberships
           .filter((m) => m.user)
           .map((m) => ({ id: m.user!.id, name: m.user!.name }));
 
@@ -58,6 +65,25 @@ export function useProjectMembers(
         }
 
         setMembers(users);
+
+        // Подтягиваем email для аватарок отдельно, best-effort (issue #44):
+        // список участников не ждёт этого и не падает, если /users/{id}.json
+        // отдаёт 403 (не-админам Redmine чужой mail не показывает).
+        void Promise.all(
+          users.map(async (u) => {
+            try {
+              const res = await client.GET("/users/{user_id}.{format}", {
+                params: { path: { format: "json", user_id: u.id } },
+              });
+              const mail = res.data?.user?.mail;
+              return mail ? { ...u, mail } : u;
+            } catch {
+              return u;
+            }
+          }),
+        ).then((withMail) => {
+          if (!cancelled && withMail.some((u) => u.mail)) setMembers(withMail);
+        });
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);

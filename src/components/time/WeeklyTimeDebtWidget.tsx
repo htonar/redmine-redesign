@@ -1,4 +1,12 @@
-import { AlertTriangle, Check, Loader2, Plus } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,7 +30,8 @@ interface DayBarProps {
 }
 
 function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime }: DayBarProps) {
-  const met = !day.isFuture && day.deficit === 0;
+  // Выходной: нормы нет, столбик нейтральный, "+" не показываем.
+  const met = !day.isFuture && !day.isWeekend && day.deficit === 0;
   const fillPct = day.isFuture ? 0 : Math.min(100, (day.hoursLogged / DAILY_TARGET_HOURS) * 100);
 
   return (
@@ -49,7 +58,14 @@ function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime
       >
         {!day.isFuture && (
           <div
-            className={cn("w-full rounded-t-md transition-all", met ? "bg-success" : "bg-warning")}
+            className={cn(
+              "w-full rounded-t-md transition-all",
+              day.isWeekend
+                ? "bg-muted-foreground/50"
+                : met
+                  ? "bg-success"
+                  : "bg-warning",
+            )}
             style={{ height: `${fillPct}%` }}
           />
         )}
@@ -68,7 +84,7 @@ function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime
         {day.isFuture ? "—" : `${day.hoursLogged.toFixed(1)}ч`}
       </div>
 
-      {!day.isFuture && day.deficit > 0 && projects.length > 0 && (
+      {!day.isFuture && !day.isWeekend && day.deficit > 0 && projects.length > 0 && (
         <LogTimeDialog
           client={client}
           projects={projects}
@@ -120,17 +136,45 @@ export function WeeklyTimeDebtWidget({
   defaultProjectId,
   onLogTime,
 }: WeeklyTimeDebtWidgetProps) {
-  const { days, totalDeficit, isLoading, error, reload } = useWeeklyTimeDebt(client);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const { days, totalDeficit, rangeLabel, isLoading, error, reload } =
+    useWeeklyTimeDebt(client, weekOffset);
 
   async function handleLogTime(input: TimeEntryInput) {
     await onLogTime(input);
     reload();
   }
 
+  // Выходные показываем, только если в них есть залогированное время -
+  // иначе не засоряем виджет пустыми Сб/Вс (issue #35).
+  const visibleDays = days.filter((d) => !d.isWeekend || d.hoursLogged > 0);
+
   return (
     <Card>
-      <CardHeader className="border-b">
-        <CardTitle>Трудозатраты на этой неделе</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 border-b">
+        <CardTitle>
+          {weekOffset === 0 ? "Трудозатраты на этой неделе" : "Трудозатраты за неделю"}
+        </CardTitle>
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Предыдущая неделя"
+            onClick={() => setWeekOffset((o) => o - 1)}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <span className="min-w-28 text-center text-xs">{rangeLabel}</span>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Следующая неделя"
+            disabled={weekOffset >= 0}
+            onClick={() => setWeekOffset((o) => o + 1)}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {error && (
@@ -166,7 +210,7 @@ export function WeeklyTimeDebtWidget({
             </div>
 
             <div className="flex items-end gap-3">
-              {days.map((day) => (
+              {visibleDays.map((day) => (
                 <DayBar
                   key={day.date}
                   day={day}
