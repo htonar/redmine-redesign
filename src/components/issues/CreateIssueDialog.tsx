@@ -148,6 +148,15 @@ export function CreateIssueDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, priorities]);
 
+  // Трекер обязателен (Redmine отдаёт 422 без него, issue #60) - подставляем
+  // первый из справочника, пока пользователь не выбрал другой.
+  useEffect(() => {
+    if (open && trackers.length > 0 && values.trackerId === null) {
+      setValues((v) => ({ ...v, trackerId: trackers[0].id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, trackers]);
+
   // Сброс формы при открытии - вынесено из onOpenChange в эффект, потому что
   // при управляемом open (см. хоткей "c" в AppLayout.tsx) Radix не вызывает
   // onOpenChange для переходов, инициированных снаружи (только для
@@ -173,7 +182,14 @@ export function CreateIssueDialog({
     setProjectId(
       defaultIsAllowed ? defaultProjectId! : (projects[0]?.id ?? null),
     );
-    setValues(EMPTY_VALUES);
+    // Трекер обязателен, приоритет почти всегда нужен (issue #60) -
+    // предзаполняем дефолтами прямо в сбросе, чтобы значение не затиралось
+    // обратно в null, если справочники уже были в кэше.
+    setValues({
+      ...EMPTY_VALUES,
+      trackerId: trackers[0]?.id ?? null,
+      priorityId: defaultPriorityId(priorities),
+    });
     setFormError(null);
     setPendingUploads([]);
     setLastCreated(null);
@@ -431,6 +447,7 @@ export function CreateIssueDialog({
                 categories={categories}
                 versions={versions}
                 subjectRequired
+                compact
                 client={client}
                 onDescriptionUpload={(f) =>
                   setPendingUploads((prev) => [...prev, f])
