@@ -42,6 +42,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SaveViewDialog } from "@/components/issues/SaveViewDialog";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
 import { KanbanBoard } from "@/components/issues/KanbanBoard";
+import { KanbanColumnSettings } from "@/components/issues/KanbanColumnSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssues } from "@/hooks/useIssues";
 import { useIssueViews } from "@/hooks/useIssueViews";
@@ -52,6 +53,8 @@ import { useTrackers } from "@/hooks/useTrackers";
 import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { useProjectVersions } from "@/hooks/useProjectVersions";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
+import { useIssueStatuses } from "@/hooks/useIssueStatuses";
+import { useKanbanColumnPrefs } from "@/hooks/useKanbanColumnPrefs";
 import {
   ActiveFilterChips,
   EMPTY_ADVANCED_FILTERS,
@@ -184,8 +187,14 @@ export function IssuesPage() {
   const { queries } = useQueries(client);
   const { trackers } = useTrackers(client);
   const { priorities } = useIssuePriorities(client);
+  const { statuses } = useIssueStatuses(client);
   const { versions } = useProjectVersions(client, selectedProjectId);
   const { members } = useProjectMembers(client, selectedProjectId, user);
+  const [kanbanColumnPrefs, setKanbanColumnPrefs] = useKanbanColumnPrefs(
+    baseUrl,
+    user?.id,
+    selectedProjectId ?? 0,
+  );
 
   // Версия и автор привязаны к проекту - при смене проекта в шапке
   // сбрасываем их, иначе остаётся id из чужого проекта и список молча пуст.
@@ -383,6 +392,14 @@ export function IssuesPage() {
             disabled={queryId !== null}
           />
         )}
+
+        {layout === "kanban" && selectedProjectId !== null && (
+          <KanbanColumnSettings
+            statuses={statuses}
+            prefs={kanbanColumnPrefs}
+            onChange={setKanbanColumnPrefs}
+          />
+        )}
       </div>
 
       {layout === "table" && queryId === null && (
@@ -420,6 +437,7 @@ export function IssuesPage() {
             projectId={selectedProjectId}
             assignee={assignee}
             canEdit={can("edit_issues", selectedProjectId)}
+            columnPrefs={kanbanColumnPrefs}
           />
         ))}
 
