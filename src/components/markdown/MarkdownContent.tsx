@@ -10,6 +10,7 @@ import {
 } from "@/components/markdown/useAttachmentMediaUrls";
 import { usePrMrStatuses } from "@/hooks/usePrMrStatuses";
 import { extractPrMrLinks } from "@/lib/pr-mr-links";
+import { parseImageTitle, textileImagesToMarkdown } from "@/lib/textile-images";
 import type { PrMrStatus } from "@/lib/pr-mr-status";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +64,10 @@ export interface MarkdownContentProps {
  * поэтому если инстанс настроен на Textile, наш рендер не будет совпадать с
  * тем, что видит пользователь на самом Redmine. Не проверяется через API -
  * такой настройки не отдаётся ни одним публичным REST-эндпоинтом.
+ *
+ * Исключение - Textile-разметка картинок (`!name!`, `!{width: 680px}.name!`):
+ * такие вставки частые (вставка из буфера на Textile-инстансе), поэтому их
+ * переписываем в markdown перед рендером (см. textileImagesToMarkdown).
  */
 export function MarkdownContent({
   text,
@@ -78,6 +83,11 @@ export function MarkdownContent({
 
   if (!text.trim()) return null;
 
+  // Textile-картинки (`!name!`, `!{width: 680px}.name!`, ...) в тексте с
+  // инстансов на Textile-формате - переписываем в markdown, размер уезжает
+  // в title и разбирается в рендерере img/video ниже.
+  const rendered = textileImagesToMarkdown(text);
+
   return (
     <>
       <div
@@ -89,13 +99,17 @@ export function MarkdownContent({
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            img: ({ src, alt }) => {
+            img: ({ src, alt, title }) => {
               const hit = typeof src === "string" ? media[src] : undefined;
+              const { width, height, title: realTitle } = parseImageTitle(title);
+              const dimStyle =
+                width || height ? { maxWidth: "100%", width, height } : undefined;
               if (hit?.kind === "video") {
                 return (
                   <video
                     src={hit.url}
                     controls
+                    style={dimStyle}
                     className="max-w-full rounded-lg border border-border"
                   />
                 );
@@ -107,6 +121,8 @@ export function MarkdownContent({
                 <img
                   src={hit?.url ?? src}
                   alt={alt ?? ""}
+                  title={realTitle}
+                  style={dimStyle}
                   className="rounded-lg border border-border"
                 />
               );
@@ -118,7 +134,7 @@ export function MarkdownContent({
             ),
           }}
         >
-          {text}
+          {rendered}
         </ReactMarkdown>
       </div>
       {prMrLinks.length > 0 && (
