@@ -139,6 +139,56 @@ describe("listIssues", () => {
     await listIssues(mockClient(GET2), baseParams);
     expect(GET2.mock.calls[0][1].params.query.watcher_id).toBeUndefined();
   });
+
+  it("расширенные фильтры (трекер/приоритет/версия/автор) -> *_id строкой", async () => {
+    const GET = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET), {
+      ...baseParams,
+      trackerId: 2,
+      priorityId: 5,
+      versionId: 9,
+      authorId: 11,
+    });
+    const query = GET.mock.calls[0][1].params.query;
+    expect(query.tracker_id).toBe("2");
+    expect(query.priority_id).toBe("5");
+    expect(query.fixed_version_id).toBe("9");
+    expect(query.author_id).toBe("11");
+  });
+
+  it("расширенные фильтры не заданы -> соответствующие параметры undefined", async () => {
+    const GET = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET), baseParams);
+    const query = GET.mock.calls[0][1].params.query;
+    expect(query.tracker_id).toBeUndefined();
+    expect(query.priority_id).toBeUndefined();
+    expect(query.fixed_version_id).toBeUndefined();
+    expect(query.author_id).toBeUndefined();
+    expect(query.subject).toBeUndefined();
+  });
+
+  it("subject -> оператор '~' (содержит), пустая строка игнорируется", async () => {
+    const GET = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET), { ...baseParams, subject: "  логин  " });
+    expect(GET.mock.calls[0][1].params.query.subject).toBe("~логин");
+
+    const GET2 = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET2), { ...baseParams, subject: "   " });
+    expect(GET2.mock.calls[0][1].params.query.subject).toBeUndefined();
+  });
+
+  it("queryId задан -> расширенные фильтры тоже не отправляются", async () => {
+    const GET = vi.fn().mockResolvedValue({ data: { issues: [] } });
+    await listIssues(mockClient(GET), {
+      ...baseParams,
+      queryId: 3,
+      trackerId: 2,
+      subject: "x",
+    });
+    const query = GET.mock.calls[0][1].params.query;
+    expect(query.tracker_id).toBeUndefined();
+    expect(query.subject).toBeUndefined();
+  });
 });
 
 function fakeIssues(count: number): IssueSummary[] {
