@@ -62,7 +62,15 @@ import {
   IssueFilterPanel,
   type AdvancedIssueFilters,
 } from "@/components/issues/IssueFilterPanel";
-import { updateIssue, type IssueListFilters } from "@/api/issues";
+import {
+  deleteIssue,
+  updateIssue,
+  type IssueListFilters,
+} from "@/api/issues";
+import { addWatcher } from "@/api/watchers";
+import { runBulk, summarizeBulk, type BulkResult } from "@/lib/bulk-runner";
+import { BulkActionBar } from "@/components/issues/BulkActionBar";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import { issueUrl } from "@/lib/redmine-url";
 import { openExternal } from "@/lib/open-external";
@@ -203,6 +211,7 @@ export function IssuesPage() {
     hasMore,
     loadMore,
     patchIssue,
+    reload: reloadIssues,
   } = useIssues(client, filters);
   const { views, save, remove } = useIssueViews(baseUrl, user?.id);
   const { projects } = useProjects(client);
@@ -278,6 +287,58 @@ export function IssuesPage() {
     } finally {
       setInlineBusyId(null);
     }
+  }
+
+  // --- Множественный выбор и групповые действия (issue #37) ---
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Убираем из выбора id, которых больше нет в загруженном списке (сменились
+  // фильтры / прошло удаление).
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const present = new Set(issues.map((i) => i.id));
+      const next = new Set([...prev].filter((id) => present.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [issues]);
+
+  function toggleSelected(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) =>
+      prev.size === issues.length ? new Set() : new Set(issues.map((i) => i.id)),
+    );
+  }
+
+  async function runBulkAction(task: (id: number) => Promise<void>) {
+    if (!client || selectedIds.size === 0 || bulkBusy) return;
+    const ids = [...selectedIds];
+    setBulkBusy(true);
+    setBulkResult(null);
+    setBulkProgress({ done: 0, total: ids.length });
+    const result = await runBulk(ids, task, {
+      onProgress: (done, total) => setBulkProgress({ done, total }),
+    });
+    setBulkBusy(false);
+    setBulkProgress(null);
+    setBulkResult(result);
+    setSelectedIds(new Set());
+    reloadIssues();
   }
 
   function applyView(view: IssueView) {
@@ -697,6 +758,56 @@ export function IssuesPage() {
         </Alert>
       )}
 
+      {layout === "table" && selectedIds.size > 0 && (
+        <BulkActionBar
+          count={selectedIds.size}
+          busy={bulkBusy}
+          progress={bulkProgress}
+          statuses={statuses}
+          members={members}
+          versions={versions}
+          projectScoped={selectedProjectId !== null}
+          canDelete={can("delete_issues", selectedProjectId)}
+          onSetStatus={(statusId) =>
+            runBulkAction((id) => updateIssue(client!, id, { statusId }))
+          }
+          onSetAssignee={(userId) =>
+            runBulkAction((id) =>
+              updateIssue(client!, id, { assignedToId: userId }),
+            )
+          }
+          onSetVersion={(versionId) =>
+            runBulkAction((id) =>
+              updateIssue(client!, id, { fixedVersionId: versionId }),
+            )
+          }
+          onWatchMe={() =>
+            user &&
+            runBulkAction((id) => addWatcher(client!, id, user.id))
+          }
+          onDelete={() => setBulkDeleteOpen(true)}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
+
+      {bulkResult && (
+        <Alert
+          variant={bulkResult.failed.length > 0 ? "destructive" : "default"}
+        >
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span>{summarizeBulk(bulkResult)}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setBulkResult(null)}
+            >
+              Ок
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {layout === "kanban" &&
         (selectedProjectId === null ? (
           <div className="rounded-lg border border-border bg-card py-8 text-center text-muted-foreground">
@@ -717,6 +828,23 @@ export function IssuesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-9">
+                  <input
+                    type="checkbox"
+                    className="size-4 cursor-pointer accent-primary align-middle"
+                    aria-label="Выбрать все"
+                    checked={
+                      issues.length > 0 && selectedIds.size === issues.length
+                    }
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate =
+                          selectedIds.size > 0 &&
+                          selectedIds.size < issues.length;
+                    }}
+                    onChange={toggleSelectAll}
+                  />
+                </TableHead>
                 {visibleCols.map((col) => (
                   <TableHead key={col.id} className={col.cellClass}>
                     {col.sortField ? (
@@ -745,7 +873,7 @@ export function IssuesPage() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={visibleCols.length + 1}>
+                    <TableCell colSpan={visibleCols.length + 2}>
                       <Skeleton className="h-5 w-full" />
                     </TableCell>
                   </TableRow>
@@ -753,7 +881,7 @@ export function IssuesPage() {
 
               {!isLoading && issues.length === 0 && !error && (
                 <TableRow>
-                  <TableCell colSpan={visibleCols.length + 1}>
+                  <TableCell colSpan={visibleCols.length + 2}>
                     <EmptyState
                       size="default"
                       title="Задач по этим фильтрам не найдено"
@@ -776,8 +904,18 @@ export function IssuesPage() {
                     className={cn(
                       "relative cursor-pointer animate-in fade-in-0 duration-200 hover:bg-accent/50 motion-reduce:animate-none",
                       i === navIndex && "bg-accent",
+                      selectedIds.has(issue.id) && "bg-primary/5",
                     )}
                   >
+                    <TableCell className="w-9">
+                      <input
+                        type="checkbox"
+                        className="relative z-10 size-4 cursor-pointer accent-primary align-middle"
+                        aria-label={`Выбрать задачу #${issue.id}`}
+                        checked={selectedIds.has(issue.id)}
+                        onChange={() => toggleSelected(issue.id)}
+                      />
+                    </TableCell>
                     {visibleCols.map((col) => (
                       <TableCell
                         key={col.id}
@@ -839,6 +977,17 @@ export function IssuesPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={`Удалить задач: ${selectedIds.size}?`}
+        description="Действие необратимо. Задачи без прав на удаление останутся - будет показана сводка."
+        onConfirm={async () => {
+          setBulkDeleteOpen(false);
+          await runBulkAction((id) => deleteIssue(client!, id));
+        }}
+      />
     </div>
   );
 }
