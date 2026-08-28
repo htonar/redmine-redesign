@@ -6,14 +6,22 @@ import { buildIssueReport, type IssueReport } from "@/lib/issue-report";
 /**
  * Сводка по задачам одного проекта - см. ReportsPage. Тонкая оркестрация
  * поверх listAllIssues (полная подгрузка) + buildIssueReport (чистая
- * агрегация) - см. GitHub issue #13.
+ * агрегация) - см. GitHub issue #13. `from`/`to` (issue #58) фильтруют по
+ * дате создания задачи.
  */
-export function useIssueReport(client: RedmineClient | null, projectId: number | null) {
+export function useIssueReport(
+  client: RedmineClient | null,
+  projectId: number | null,
+  range?: { from?: string; to?: string },
+) {
   const [report, setReport] = useState<IssueReport | null>(null);
   const [isCapped, setIsCapped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+
+  const from = range?.from;
+  const to = range?.to;
 
   useEffect(() => {
     if (!client || !projectId) {
@@ -27,7 +35,14 @@ export function useIssueReport(client: RedmineClient | null, projectId: number |
     setIsLoading(true);
     setError(null);
 
-    listAllIssues(client, { projectId, assignee: "all", status: "all", sort: "id" })
+    listAllIssues(client, {
+      projectId,
+      assignee: "all",
+      status: "all",
+      sort: "id",
+      createdFrom: from,
+      createdTo: to,
+    })
       .then(({ issues, isCapped: capped }) => {
         if (cancelled) return;
         setReport(buildIssueReport(issues));
@@ -44,7 +59,7 @@ export function useIssueReport(client: RedmineClient | null, projectId: number |
     return () => {
       cancelled = true;
     };
-  }, [client, projectId, reloadToken]);
+  }, [client, projectId, from, to, reloadToken]);
 
   function reload() {
     setReloadToken((t) => t + 1);

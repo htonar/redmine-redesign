@@ -5,7 +5,7 @@ import {
   statusTone,
 } from "@/lib/issue-visuals";
 
-describe("priorityTone", () => {
+describe("priorityTone по имени (фолбэк)", () => {
   it("Immediate/Urgent -> danger", () => {
     expect(priorityTone("Immediate")).toBe("danger");
     expect(priorityTone("Срочный")).toBe("danger");
@@ -19,6 +19,37 @@ describe("priorityTone", () => {
     expect(priorityTone("Normal")).toBe("neutral");
     expect(priorityTone("Низкий")).toBe("muted");
     expect(priorityTone(undefined)).toBe("neutral");
+  });
+});
+
+describe("priorityTone по позиции в справочнике", () => {
+  // Порядок как отдаёт API - по возрастанию важности, is_default = "обычный".
+  const ordered = [
+    { id: 1, isDefault: false }, // низкий
+    { id: 2, isDefault: true }, // обычный
+    { id: 3, isDefault: false }, // высокий
+    { id: 4, isDefault: false }, // очень высокий
+    { id: 5, isDefault: false }, // критический (верхний)
+  ];
+  it("ниже дефолта -> muted, дефолт -> neutral", () => {
+    expect(priorityTone({ id: 1, name: "Мороженка" }, ordered)).toBe("muted");
+    expect(priorityTone({ id: 2, name: "как угодно" }, ordered)).toBe("neutral");
+  });
+  it("выше дефолта -> warning, самый верхний -> danger", () => {
+    expect(priorityTone({ id: 3 }, ordered)).toBe("warning");
+    expect(priorityTone({ id: 4 }, ordered)).toBe("warning");
+    expect(priorityTone({ id: 5 }, ordered)).toBe("danger");
+  });
+  it("произвольные названия не влияют - работает позиция", () => {
+    const weird = [
+      { id: 10, isDefault: true },
+      { id: 20, isDefault: false },
+    ];
+    expect(priorityTone({ id: 10, name: "Blocker" }, weird)).toBe("neutral");
+    expect(priorityTone({ id: 20, name: "Trivial" }, weird)).toBe("danger");
+  });
+  it("id не найден в справочнике -> откат на имя", () => {
+    expect(priorityTone({ id: 999, name: "High" }, ordered)).toBe("warning");
   });
 });
 

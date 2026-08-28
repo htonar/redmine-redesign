@@ -31,7 +31,9 @@ import { useListKeyboardNav } from "@/hooks/useListKeyboardNav";
 import {
   priorityBadgeClass,
   statusBadgeClass,
+  type OrderedPriority,
 } from "@/lib/issue-visuals";
+import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 
 interface KanbanCardProps {
@@ -40,6 +42,8 @@ interface KanbanCardProps {
   onOpen: () => void;
   /** Подсвечена клавиатурной навигацией (issue #46). */
   active?: boolean;
+  /** Справочник приоритетов по важности - для тона бейджа (issue #47/#59). */
+  priorityOrder?: OrderedPriority[];
 }
 
 /**
@@ -48,7 +52,13 @@ interface KanbanCardProps {
  * конфликтуют (dnd-kit не может надежно отличить "чуть дрогнула рука при
  * клике" от намеренного драга без ручки, особенно на тачпаде).
  */
-function KanbanCard({ issue, draggable, onOpen, active }: KanbanCardProps) {
+function KanbanCard({
+  issue,
+  draggable,
+  onOpen,
+  active,
+  priorityOrder,
+}: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: issue.id,
@@ -106,7 +116,10 @@ function KanbanCard({ issue, draggable, onOpen, active }: KanbanCardProps) {
           {issue.priority?.name && (
             <Badge
               variant="outline"
-              className={cn("text-[11px]", priorityBadgeClass(issue.priority.name))}
+              className={cn(
+                "text-[11px]",
+                priorityBadgeClass(issue.priority, priorityOrder),
+              )}
             >
               {issue.priority.name}
             </Badge>
@@ -137,6 +150,7 @@ interface KanbanColumnProps {
   onOpenIssue: (id: number) => void;
   /** id карточки, подсвеченной клавиатурой (issue #46). */
   activeIssueId?: number;
+  priorityOrder?: OrderedPriority[];
 }
 
 function KanbanColumn({
@@ -147,6 +161,7 @@ function KanbanColumn({
   canEdit,
   onOpenIssue,
   activeIssueId,
+  priorityOrder,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: statusId });
 
@@ -184,6 +199,7 @@ function KanbanColumn({
             draggable={canEdit}
             active={issue.id === activeIssueId}
             onOpen={() => onOpenIssue(issue.id)}
+            priorityOrder={priorityOrder}
           />
         ))}
         {issues.length === 0 && (
@@ -224,6 +240,11 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const navigate = useNavigate();
   const { statuses, isLoading: statusesLoading } = useIssueStatuses(client);
+  const { priorities } = useIssuePriorities(client);
+  const priorityOrder = useMemo(
+    () => priorities.map((p) => ({ id: p.id, isDefault: p.isDefault })),
+    [priorities],
+  );
   const { issues, totalCount, isLoading, error, hasMore, moveLocally } =
     useKanbanIssues(client, {
       projectId,
@@ -387,12 +408,18 @@ export function KanbanBoard({
               canEdit={canEdit}
               activeIssueId={activeIssueId}
               onOpenIssue={(id) => navigate(`/issues/${id}`)}
+              priorityOrder={priorityOrder}
             />
           ))}
         </div>
         <DragOverlay>
           {activeIssue && (
-            <KanbanCard issue={activeIssue} draggable onOpen={() => {}} />
+            <KanbanCard
+              issue={activeIssue}
+              draggable
+              onOpen={() => {}}
+              priorityOrder={priorityOrder}
+            />
           )}
         </DragOverlay>
       </DndContext>
