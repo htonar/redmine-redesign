@@ -65,6 +65,45 @@ export async function listTimeEntries(
   return { entries: data.time_entries, totalCount: data.total_count ?? data.time_entries.length };
 }
 
+const TE_PAGE_LIMIT = 100;
+const TE_MAX_ENTRIES = 5000;
+
+export interface ListAllTimeEntriesResult {
+  entries: TimeEntry[];
+  totalCount: number;
+  /** true - показаны не все записи (уперлись в защитный лимит). */
+  isCapped: boolean;
+}
+
+/**
+ * Полная постраничная подгрузка записей времени под фильтр - для отчёта по
+ * трудозатратам (issue #57), где нужна точная сумма по всем записям периода,
+ * а не витрина с пагинацией.
+ */
+export async function listAllTimeEntries(
+  client: RedmineClient,
+  filters: TimeEntryListFilters,
+): Promise<ListAllTimeEntriesResult> {
+  let entries: TimeEntry[] = [];
+  let totalCount = 0;
+  let offset = 0;
+
+  while (offset < TE_MAX_ENTRIES) {
+    const page = await listTimeEntries(client, {
+      ...filters,
+      offset,
+      limit: TE_PAGE_LIMIT,
+    });
+    totalCount = page.totalCount;
+    entries = entries.concat(page.entries);
+    offset += TE_PAGE_LIMIT;
+    if (page.entries.length === 0) break;
+    if (offset >= totalCount) break;
+  }
+
+  return { entries, totalCount, isCapped: entries.length < totalCount };
+}
+
 function toRequestBody(input: TimeEntryInput) {
   return {
     issue_id: input.issueId,

@@ -43,6 +43,7 @@ import { SaveViewDialog } from "@/components/issues/SaveViewDialog";
 import { CreateIssueDialog } from "@/components/issues/CreateIssueDialog";
 import { KanbanBoard } from "@/components/issues/KanbanBoard";
 import { KanbanColumnSettings } from "@/components/issues/KanbanColumnSettings";
+import { ListColumnSettings } from "@/components/issues/ListColumnSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIssues } from "@/hooks/useIssues";
 import { useIssueViews } from "@/hooks/useIssueViews";
@@ -67,7 +68,16 @@ import { issueUrl } from "@/lib/redmine-url";
 import { openExternal } from "@/lib/open-external";
 import { cn } from "@/lib/utils";
 import { useListKeyboardNav } from "@/hooks/useListKeyboardNav";
-import { priorityTextClass, statusBadgeClass } from "@/lib/issue-visuals";
+import {
+  dueDateState,
+  priorityTextClass,
+  statusBadgeClass,
+} from "@/lib/issue-visuals";
+import {
+  visibleOrderedColumns,
+  type ListColumnDef,
+} from "@/lib/list-columns";
+import { useListColumnPrefs } from "@/hooks/useListColumnPrefs";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 import { isTauri } from "@tauri-apps/api/core";
 import type { IssueView } from "@/lib/issue-views-storage";
@@ -105,18 +115,11 @@ const NO_QUERY = "__none__";
 /** Сентинел для пункта "Не назначено" в инлайн-Select исполнителя (issue #36). */
 const UNASSIGNED = "__unassigned__";
 
-/**
- * `cellClass` прячет второстепенные колонки на узких экранах, чтобы таблица
- * не уезжала в горизонтальный скролл. ID / Тема / Статус видны всегда.
- */
-const SORTABLE_COLUMNS: { field: string; label: string; cellClass?: string }[] = [
-  { field: "id", label: "ID" },
-  { field: "subject", label: "Тема" },
-  { field: "tracker", label: "Трекер", cellClass: "hidden md:table-cell" },
-  { field: "priority", label: "Приоритет", cellClass: "hidden sm:table-cell" },
-  { field: "status", label: "Статус" },
-  { field: "updated_on", label: "Обновлено", cellClass: "hidden lg:table-cell" },
-];
+const DATE_FMT: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+};
 
 /**
  * Список задач: фильтры (проект - в Topbar, исполнитель, статус), сортировка,
@@ -214,6 +217,15 @@ export function IssuesPage() {
     user?.id,
     selectedProjectId ?? 0,
   );
+  const [columnPrefs, setColumnPrefs] = useListColumnPrefs(baseUrl, user?.id);
+  const visibleCols = useMemo(
+    () => visibleOrderedColumns(columnPrefs),
+    [columnPrefs],
+  );
+  const priorityOrder = useMemo(
+    () => priorities.map((p) => ({ id: p.id, isDefault: p.isDefault })),
+    [priorities],
+  );
 
   // Версия и автор привязаны к проекту - при смене проекта в шапке
   // сбрасываем их, иначе остаётся id из чужого проекта и список молча пуст.
@@ -295,6 +307,199 @@ export function IssuesPage() {
   const canCreateIssue =
     creatableProjects.length > 0 &&
     (selectedProjectId === null || can("add_issues", selectedProjectId));
+
+  // --- Рендер ячеек настраиваемых колонок списка (issue #56) ---
+  const fmtDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString("ru-RU", DATE_FMT) : "-";
+
+  type Row = (typeof issues)[number];
+
+  function renderStatusCell(issue: Row) {
+    if (can("edit_issues", issue.project?.id) && statuses.length > 0) {
+      return (
+        <Select
+          value={String(issue.status?.id ?? "")}
+          disabled={inlineBusyId === issue.id}
+          onValueChange={(v) => {
+            const next = statuses.find((s) => String(s.id) === v);
+            if (!next || next.id === issue.status?.id) return;
+            const prev = issue.status;
+            void inlinePatch(
+              issue.id,
+              { statusId: next.id },
+              {
+                status: {
+                  id: next.id,
+                  name: next.name,
+                  is_closed: next.isClosed,
+                },
+              },
+              { status: prev },
+            );
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="relative z-10 h-7 w-[8.5rem] border-transparent bg-transparent px-2 hover:bg-accent"
+            aria-label="Статус задачи"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {statuses.map((s) => (
+              <SelectItem key={s.id} value={String(s.id)}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    return (
+      issue.status && (
+        <Badge variant="outline" className={statusBadgeClass(issue.status)}>
+          {issue.status.name}
+        </Badge>
+      )
+    );
+  }
+
+  function renderAssigneeCell(issue: Row) {
+    if (
+      selectedProjectId &&
+      members.length > 0 &&
+      can("edit_issues", issue.project?.id)
+    ) {
+      return (
+        <Select
+          value={
+            issue.assigned_to ? String(issue.assigned_to.id) : UNASSIGNED
+          }
+          disabled={inlineBusyId === issue.id}
+          onValueChange={(v) => {
+            const nextId = v === UNASSIGNED ? null : Number(v);
+            if (nextId === (issue.assigned_to?.id ?? null)) return;
+            const prev = issue.assigned_to;
+            const nextMember = members.find((m) => m.id === nextId);
+            void inlinePatch(
+              issue.id,
+              { assignedToId: nextId },
+              {
+                assigned_to: nextMember
+                  ? { id: nextMember.id, name: nextMember.name }
+                  : undefined,
+              },
+              { assigned_to: prev },
+            );
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="relative z-10 h-7 w-[10rem] border-transparent bg-transparent px-2 hover:bg-accent"
+            aria-label="Исполнитель задачи"
+          >
+            <SelectValue placeholder="Не назначено" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNASSIGNED}>Не назначено</SelectItem>
+            {issue.assigned_to &&
+              !members.some((m) => m.id === issue.assigned_to!.id) && (
+                <SelectItem value={String(issue.assigned_to.id)}>
+                  {issue.assigned_to.name}
+                </SelectItem>
+              )}
+            {members.map((m) => (
+              <SelectItem key={m.id} value={String(m.id)}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    return issue.assigned_to?.name ?? "-";
+  }
+
+  function renderCell(col: ListColumnDef, issue: Row) {
+    switch (col.id) {
+      case "id":
+        return (
+          <Link
+            to={`/issues/${issue.id}`}
+            className="after:absolute after:inset-0 after:content-['']"
+            aria-label={`Открыть задачу #${issue.id}`}
+          >
+            #{issue.id}
+          </Link>
+        );
+      case "subject":
+        return issue.subject;
+      case "tracker":
+        return issue.tracker?.name ?? "-";
+      case "priority":
+        return (
+          <span className={priorityTextClass(issue.priority, priorityOrder)}>
+            {issue.priority?.name ?? "-"}
+          </span>
+        );
+      case "status":
+        return renderStatusCell(issue);
+      case "assigned_to":
+        return renderAssigneeCell(issue);
+      case "updated_on":
+        return formatRelativeTime(issue.updated_on);
+      case "project":
+        return issue.project?.name ?? "-";
+      case "due_date": {
+        const st = dueDateState(
+          issue.due_date,
+          issue.status?.is_closed ?? false,
+        );
+        return (
+          <span
+            className={cn(
+              st === "overdue" && "font-medium text-red-600 dark:text-red-400",
+              st === "soon" &&
+                "font-medium text-orange-600 dark:text-orange-400",
+            )}
+          >
+            {fmtDate(issue.due_date)}
+          </span>
+        );
+      }
+      case "done_ratio":
+        return `${issue.done_ratio}%`;
+      case "category":
+        return issue.category?.name ?? "-";
+      case "fixed_version":
+        return issue.fixed_version?.name ?? "-";
+      case "start_date":
+        return fmtDate(issue.start_date);
+      case "estimated_hours":
+        return issue.estimated_hours != null
+          ? `${issue.estimated_hours} ч`
+          : "-";
+      case "spent_hours":
+        return issue.spent_hours != null
+          ? `${issue.spent_hours.toFixed(2)} ч`
+          : "-";
+      default:
+        return null;
+    }
+  }
+
+  const COL_BODY_CLASS: Partial<Record<ListColumnDef["id"], string>> = {
+    id: "text-muted-foreground",
+    subject: "max-w-[45vw] truncate font-medium sm:max-w-xs",
+    tracker: "text-muted-foreground",
+    priority: "font-medium",
+    updated_on: "text-muted-foreground",
+    project: "text-muted-foreground",
+    start_date: "text-muted-foreground",
+    done_ratio: "text-muted-foreground",
+    estimated_hours: "text-muted-foreground",
+    spent_hours: "text-muted-foreground",
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -446,6 +651,13 @@ export function IssuesPage() {
           />
         )}
 
+        {layout === "table" && (
+          <ListColumnSettings
+            prefs={columnPrefs}
+            onChange={setColumnPrefs}
+          />
+        )}
+
         {layout === "kanban" && selectedProjectId !== null && (
           <KanbanColumnSettings
             statuses={statuses}
@@ -505,25 +717,27 @@ export function IssuesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                {SORTABLE_COLUMNS.map(({ field, label, cellClass }) => (
-                  <TableHead key={field} className={cellClass}>
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(field)}
-                      className="flex items-center gap-1 hover:text-foreground"
-                    >
-                      {label}
-                      {sortField === field &&
-                        (sortDir === "desc" ? (
-                          <ArrowDown className="size-3.5" />
-                        ) : (
-                          <ArrowUp className="size-3.5" />
-                        ))}
-                    </button>
+                {visibleCols.map((col) => (
+                  <TableHead key={col.id} className={col.cellClass}>
+                    {col.sortField ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(col.sortField!)}
+                        className="flex items-center gap-1 hover:text-foreground"
+                      >
+                        {col.label}
+                        {sortField === col.sortField &&
+                          (sortDir === "desc" ? (
+                            <ArrowDown className="size-3.5" />
+                          ) : (
+                            <ArrowUp className="size-3.5" />
+                          ))}
+                      </button>
+                    ) : (
+                      col.label
+                    )}
                   </TableHead>
                 ))}
-                <TableHead className="hidden xl:table-cell">Проект</TableHead>
-                <TableHead className="hidden lg:table-cell">Исполнитель</TableHead>
                 <TableHead className="hidden w-9 sm:table-cell" />
               </TableRow>
             </TableHeader>
@@ -531,7 +745,7 @@ export function IssuesPage() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={9}>
+                    <TableCell colSpan={visibleCols.length + 1}>
                       <Skeleton className="h-5 w-full" />
                     </TableCell>
                   </TableRow>
@@ -539,7 +753,7 @@ export function IssuesPage() {
 
               {!isLoading && issues.length === 0 && !error && (
                 <TableRow>
-                  <TableCell colSpan={9}>
+                  <TableCell colSpan={visibleCols.length + 1}>
                     <EmptyState
                       size="default"
                       title="Задач по этим фильтрам не найдено"
@@ -564,155 +778,19 @@ export function IssuesPage() {
                       i === navIndex && "bg-accent",
                     )}
                   >
-                    <TableCell className="text-muted-foreground">
-                      {/* Растянутая ссылка на всю строку (issue #55): обычный
-                          клик - SPA-переход, Ctrl/Cmd/средняя кнопка и
-                          "Открыть в новой вкладке" работают нативно. */}
-                      <Link
-                        to={`/issues/${issue.id}`}
-                        className="after:absolute after:inset-0 after:content-['']"
-                        aria-label={`Открыть задачу #${issue.id}`}
+                    {visibleCols.map((col) => (
+                      <TableCell
+                        key={col.id}
+                        className={cn(col.cellClass, COL_BODY_CLASS[col.id])}
+                        title={
+                          col.id === "updated_on"
+                            ? fullTimestamp(issue.updated_on)
+                            : undefined
+                        }
                       >
-                        #{issue.id}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="max-w-[45vw] truncate font-medium sm:max-w-xs">
-                      {issue.subject}
-                    </TableCell>
-                    <TableCell className="hidden text-muted-foreground md:table-cell">
-                      {issue.tracker?.name ?? "-"}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "hidden font-medium sm:table-cell",
-                        priorityTextClass(issue.priority?.name),
-                      )}
-                    >
-                      {issue.priority?.name ?? "-"}
-                    </TableCell>
-                    <TableCell>
-                      {can("edit_issues", issue.project?.id) &&
-                      statuses.length > 0 ? (
-                        <Select
-                          value={String(issue.status?.id ?? "")}
-                          disabled={inlineBusyId === issue.id}
-                          onValueChange={(v) => {
-                            const next = statuses.find(
-                              (s) => String(s.id) === v,
-                            );
-                            if (!next || next.id === issue.status?.id) return;
-                            const prev = issue.status;
-                            void inlinePatch(
-                              issue.id,
-                              { statusId: next.id },
-                              {
-                                status: {
-                                  id: next.id,
-                                  name: next.name,
-                                  is_closed: next.isClosed,
-                                },
-                              },
-                              { status: prev },
-                            );
-                          }}
-                        >
-                          <SelectTrigger
-                            size="sm"
-                            className="relative z-10 h-7 w-[8.5rem] border-transparent bg-transparent px-2 hover:bg-accent"
-                            aria-label="Статус задачи"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statuses.map((s) => (
-                              <SelectItem key={s.id} value={String(s.id)}>
-                                {s.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        issue.status && (
-                          <Badge
-                            variant="outline"
-                            className={statusBadgeClass(issue.status)}
-                          >
-                            {issue.status.name}
-                          </Badge>
-                        )
-                      )}
-                    </TableCell>
-                    <TableCell
-                      className="hidden text-muted-foreground lg:table-cell"
-                      title={fullTimestamp(issue.updated_on)}
-                    >
-                      {formatRelativeTime(issue.updated_on)}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell">
-                      {issue.project?.name ?? "-"}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {selectedProjectId &&
-                      members.length > 0 &&
-                      can("edit_issues", issue.project?.id) ? (
-                        <Select
-                          value={
-                            issue.assigned_to
-                              ? String(issue.assigned_to.id)
-                              : UNASSIGNED
-                          }
-                          disabled={inlineBusyId === issue.id}
-                          onValueChange={(v) => {
-                            const nextId = v === UNASSIGNED ? null : Number(v);
-                            if (nextId === (issue.assigned_to?.id ?? null)) return;
-                            const prev = issue.assigned_to;
-                            const nextMember = members.find(
-                              (m) => m.id === nextId,
-                            );
-                            void inlinePatch(
-                              issue.id,
-                              { assignedToId: nextId },
-                              {
-                                assigned_to: nextMember
-                                  ? { id: nextMember.id, name: nextMember.name }
-                                  : undefined,
-                              },
-                              { assigned_to: prev },
-                            );
-                          }}
-                        >
-                          <SelectTrigger
-                            size="sm"
-                            className="relative z-10 h-7 w-[10rem] border-transparent bg-transparent px-2 hover:bg-accent"
-                            aria-label="Исполнитель задачи"
-                          >
-                            <SelectValue placeholder="Не назначено" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={UNASSIGNED}>
-                              Не назначено
-                            </SelectItem>
-                            {issue.assigned_to &&
-                              !members.some(
-                                (m) => m.id === issue.assigned_to!.id,
-                              ) && (
-                                <SelectItem
-                                  value={String(issue.assigned_to.id)}
-                                >
-                                  {issue.assigned_to.name}
-                                </SelectItem>
-                              )}
-                            {members.map((m) => (
-                              <SelectItem key={m.id} value={String(m.id)}>
-                                {m.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        (issue.assigned_to?.name ?? "-")
-                      )}
-                    </TableCell>
+                        {renderCell(col, issue)}
+                      </TableCell>
+                    ))}
                     <TableCell className="hidden sm:table-cell">
                       {baseUrl && (
                         <a

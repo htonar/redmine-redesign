@@ -90,9 +90,9 @@ import {
   RELATION_TYPE_OPTIONS,
   describeIssueRelation,
 } from "@/lib/issue-relations";
-import { dueDateState } from "@/lib/issue-visuals";
+import { dueDateState, priorityBadgeClass } from "@/lib/issue-visuals";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
-import { formatFileSize } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import { celebrate } from "@/lib/celebrate";
 import { diffFormValues, formatCustomFieldValue } from "@/lib/issue-form";
 import { issueUrl } from "@/lib/redmine-url";
@@ -988,7 +988,16 @@ export function IssueDetailPage() {
                 // верстки бросалось в глаза как случайно уменьшенный
                 // элемент. Выравниваем высоту, оставляя стиль "плашки"
                 // (не кнопки - у неё нет действия по клику).
-                <Badge variant="outline" className="h-8 px-3 text-sm">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-8 px-3 text-sm",
+                    priorityBadgeClass(
+                      issue.priority,
+                      priorities.map((p) => ({ id: p.id, isDefault: p.isDefault })),
+                    ),
+                  )}
+                >
                   {issue.priority.name}
                 </Badge>
               )}

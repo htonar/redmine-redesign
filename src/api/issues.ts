@@ -34,6 +34,13 @@ export interface IssueListFilters {
   /** Формат Redmine: `field:desc`, например `updated_on:desc`. */
   sort: string;
   /**
+   * Фильтр по дате создания (`created_on`), YYYY-MM-DD - для отчётов за
+   * период (issue #58). Отправляется оператором `>=` / `<=`; если заданы обе
+   * границы - `><from|to`.
+   */
+  createdFrom?: string;
+  createdTo?: string;
+  /**
    * Id нативного Query Redmine (`GET /queries.json`, см. src/api/queries.ts,
    * issue #14). Когда задан, `listIssues` отправляет только `query_id` -
    * Redmine применяет фильтры самого query и игнорирует остальные параметры
@@ -58,6 +65,17 @@ const STATUS_QUERY: Record<IssueListFilters["status"], string | undefined> = {
   closed: "c",
   all: "*",
 };
+
+/** Синтаксис фильтра дат Redmine: `>=d`, `<=d` или `><from|to` при обеих границах. */
+function createdOnFilter(
+  from: string | undefined,
+  to: string | undefined,
+): string | undefined {
+  if (from && to) return `><${from}|${to}`;
+  if (from) return `>=${from}`;
+  if (to) return `<=${to}`;
+  return undefined;
+}
 
 export async function listIssues(
   client: RedmineClient,
@@ -92,6 +110,10 @@ export async function listIssues(
             subject: params.subject?.trim()
               ? `~${params.subject.trim()}`
               : undefined,
+            created_on: createdOnFilter(
+              params.createdFrom,
+              params.createdTo,
+            ),
           },
     },
   });
