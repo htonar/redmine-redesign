@@ -90,10 +90,10 @@ export function AppLayout() {
     return () => unlisten?.();
   }, []);
 
-  // Badge-точка на иконке трея - синхронизируется с тем же unreadCount, что
-  // уже показывает NotificationsBell в Topbar (issue #5).
+  // Badge-точка и tooltip на иконке трея - синхронизируются с тем же
+  // unreadCount, что уже показывает NotificationsBell в Topbar (issue #5).
   useEffect(() => {
-    void syncTrayBadge(unreadCount > 0);
+    void syncTrayBadge(unreadCount);
   }, [unreadCount]);
 
   useGlobalHotkeys({

@@ -24,26 +24,44 @@ struct TrayIcons {
 /// Закрашивает кружок-индикатор непрочитанных в правом нижнем углу базовой
 /// иконки. Без сглаживания - для точки такого размера незаметно, а лишний
 /// крейт (image/imageproc) ради anti-aliasing не оправдан.
+///
+/// Точка намеренно крупная (радиус ~1/4 иконки) и с контрастным кольцом:
+/// в трее Linux (Cinnamon/GNOME) иконка ужимается до ~16-22px, и прежний
+/// радиус 1/5 без обводки на этом размере был почти не виден (issue #25).
 fn badge_icon(base: &Image<'static>) -> Image<'static> {
   let width = base.width();
   let height = base.height();
   let mut rgba = base.rgba().to_vec();
 
-  let radius = (width.min(height) as i32) / 5;
+  let radius = (width.min(height) as i32) / 4;
+  // Кольцо-обводка вокруг точки - чтобы читалась и на светлом, и на тёмном
+  // фоне трея.
+  let ring = (radius / 3).max(1);
   let cx = width as i32 - radius - 1;
   let cy = height as i32 - radius - 1;
   // Тёплый красный - тот же смысл, что у бейджа непрочитанных в Topbar
   // (NotificationsBell), не обязательно тот же токен темы (Rust-бинарник не
   // видит CSS-переменные).
-  let color = [220u8, 38, 38, 255];
+  let fill = [220u8, 38, 38, 255];
+  // Почти белое кольцо с лёгкой прозрачностью - контраст без резкого канта.
+  let ring_color = [245u8, 245, 245, 235];
 
+  let outer = radius + ring;
   for y in 0..height as i32 {
     for x in 0..width as i32 {
       let dx = x - cx;
       let dy = y - cy;
-      if dx * dx + dy * dy <= radius * radius {
+      let dist_sq = dx * dx + dy * dy;
+      let color = if dist_sq <= radius * radius {
+        Some(fill)
+      } else if dist_sq <= outer * outer {
+        Some(ring_color)
+      } else {
+        None
+      };
+      if let Some(c) = color {
         let idx = ((y * width as i32 + x) * 4) as usize;
-        rgba[idx..idx + 4].copy_from_slice(&color);
+        rgba[idx..idx + 4].copy_from_slice(&c);
       }
     }
   }
@@ -58,19 +76,30 @@ fn show_main_window(app: &AppHandle) {
   }
 }
 
-/// Переключает иконку трея между обычной и с бейджем непрочитанных - вызов
-/// с фронта при каждом изменении unreadCount (см. src/lib/tray.ts).
+/// Переключает иконку трея между обычной и с бейджем непрочитанных и
+/// обновляет tooltip - вызов с фронта при каждом изменении unreadCount
+/// (см. src/lib/tray.ts).
+///
+/// Tooltip дублирует счётчик текстом: перерисовка самой иконки в трее Linux
+/// (`libappindicator`) местами не подхватывается на лету, а текст tooltip
+/// переживает любой бэкенд трея (issue #25).
 #[tauri::command]
-pub fn set_tray_unread(app: AppHandle, has_unread: bool) -> Result<(), String> {
+pub fn set_tray_unread(app: AppHandle, unread_count: u32) -> Result<(), String> {
   let icons = app.state::<Mutex<TrayIcons>>();
   let icons = icons.lock().map_err(|e| e.to_string())?;
-  let icon = if has_unread {
+  let icon = if unread_count > 0 {
     icons.badged.clone()
   } else {
     icons.normal.clone()
   };
+  let tooltip = if unread_count > 0 {
+    format!("Redfine - непрочитанных: {unread_count}")
+  } else {
+    "Redfine".to_string()
+  };
   if let Some(tray) = app.tray_by_id(TRAY_ID) {
     tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
+    tray.set_tooltip(Some(&tooltip)).map_err(|e| e.to_string())?;
   }
   Ok(())
 }
@@ -98,6 +127,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 
   TrayIconBuilder::with_id(TRAY_ID)
     .icon(normal)
+    .tooltip("Redfine")
     .menu(&menu)
     .show_menu_on_left_click(false)
     .on_menu_event(|app, event| match event.id().as_ref() {

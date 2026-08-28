@@ -14,6 +14,18 @@ import {
  * где isTauri() тоже гейтит всё десктоп-специфичное).
  */
 
+/**
+ * На Linux (Cinnamon/GNOME) уведомление без иконки часто получает только
+ * звук, но не показывается визуально (issue #25) - передаём имя иконки
+ * установленного приложения. Для .deb/.rpm-сборки Tauri ставит иконку в
+ * hicolor-тему под именем productName в нижнем регистре ("redfine"). На
+ * Windows/macOS icon по имени темы неприменим - не передаём.
+ */
+const LINUX_NOTIFICATION_ICON =
+  typeof navigator !== "undefined" && /Linux/.test(navigator.userAgent)
+    ? "redfine"
+    : undefined;
+
 let permissionPromise: Promise<boolean> | null = null;
 
 async function ensurePermission(): Promise<boolean> {
@@ -32,7 +44,7 @@ export async function sendOsNotification(title: string, body: string): Promise<v
   try {
     const granted = await ensurePermission();
     if (!granted) return;
-    sendNotification({ title, body });
+    sendNotification({ title, body, icon: LINUX_NOTIFICATION_ICON });
   } catch {
     // OS push - дополнение к in-app бейджу, не основной канал. Сбой здесь
     // (например, платформа не поддерживает уведомления) не должен ронять
