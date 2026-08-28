@@ -229,6 +229,13 @@ export function IssueDetailPage() {
   const relatedSummaries = useIssueSummaries(client, summaryIds);
 
   const [comment, setComment] = useState("");
+  // #40 - показывать ли пустые поля метаданных в сайдбаре.
+  const [showAllFields, setShowAllFields] = useState(false);
+  // #39 - фильтр истории и раскрытие полной ленты.
+  const [historyFilter, setHistoryFilter] = useState<
+    "all" | "comments" | "changes"
+  >("all");
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -855,6 +862,22 @@ export function IssueDetailPage() {
                   Редактировать
                 </Button>
               )}
+              {can("log_time", projectId) && (
+                <LogTimeDialog
+                  client={client}
+                  projects={projects}
+                  activities={activities}
+                  defaultProjectId={issue.project?.id}
+                  defaultIssueId={issue.id}
+                  onSubmit={handleLogTime}
+                  trigger={
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Plus className="size-3.5" />
+                      Время
+                    </Button>
+                  }
+                />
+              )}
               {can("delete_issues", projectId) && (
                 <Button
                   variant="outline"
@@ -1377,24 +1400,89 @@ export function IssueDetailPage() {
                   )}
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
-                  <div className="flex flex-col">
-                    {issue.journals && issue.journals.length > 0 ? (
-                      issue.journals.map((j) => (
-                        <JournalEntry
-                          key={j.id}
-                          journal={j}
-                          customFieldNames={customFieldNames}
-                          valueMaps={journalValueMaps}
-                          attachments={issue.attachments}
-                          client={client}
-                        />
-                      ))
-                    ) : (
-                      <p className="py-2 text-sm text-muted-foreground">
-                        Пока пусто
-                      </p>
-                    )}
-                  </div>
+                  {(() => {
+                    const allJournals = issue.journals ?? [];
+                    if (allJournals.length === 0) {
+                      return (
+                        <p className="py-2 text-sm text-muted-foreground">
+                          Пока пусто
+                        </p>
+                      );
+                    }
+                    const filtered = allJournals.filter((j) =>
+                      historyFilter === "all"
+                        ? true
+                        : historyFilter === "comments"
+                          ? Boolean(j.notes?.trim())
+                          : j.details.length > 0,
+                    );
+                    const COLLAPSE_AT = 8;
+                    const collapsed =
+                      !historyExpanded && filtered.length > COLLAPSE_AT;
+                    const shown = collapsed
+                      ? filtered.slice(-COLLAPSE_AT)
+                      : filtered;
+                    const hiddenOlder = filtered.length - shown.length;
+                    const FILTERS = [
+                      ["all", "Всё"],
+                      ["comments", "Комментарии"],
+                      ["changes", "Изменения"],
+                    ] as const;
+
+                    return (
+                      <>
+                        <div className="flex items-center gap-1">
+                          {FILTERS.map(([key, label]) => (
+                            <Button
+                              key={key}
+                              variant={
+                                historyFilter === key ? "secondary" : "ghost"
+                              }
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              aria-pressed={historyFilter === key}
+                              onClick={() => {
+                                setHistoryFilter(key);
+                                setHistoryExpanded(false);
+                              }}
+                            >
+                              {label}
+                            </Button>
+                          ))}
+                        </div>
+
+                        {hiddenOlder > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto self-start px-1.5 py-1 text-xs text-muted-foreground"
+                            onClick={() => setHistoryExpanded(true)}
+                          >
+                            Показать всю историю ({hiddenOlder} ещё)
+                          </Button>
+                        )}
+
+                        <div className="flex flex-col">
+                          {shown.length > 0 ? (
+                            shown.map((j) => (
+                              <JournalEntry
+                                key={j.id}
+                                journal={j}
+                                customFieldNames={customFieldNames}
+                                valueMaps={journalValueMaps}
+                                attachments={issue.attachments}
+                                client={client}
+                              />
+                            ))
+                          ) : (
+                            <p className="py-2 text-sm text-muted-foreground">
+                              Нет записей этого типа
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {can("add_issue_notes", projectId) && (
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
@@ -1426,60 +1514,108 @@ export function IssueDetailPage() {
               </Card>
             </div>
             <div className="flex min-w-0 flex-col gap-4">
-              {!isEditing && (
-                  <Card>
-                    <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-1">
-                      <Field label="Проект">
-                        {issue.project ? (
-                          <Link to="/issues" className="hover:underline">
-                            {issue.project.name}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </Field>
-                      <Field label="Автор">{issue.author?.name ?? "—"}</Field>
-                      <Field label="Исполнитель">
-                        {issue.assigned_to?.name ?? "—"}
-                      </Field>
-                      <Field label="Категория">{issue.category?.name ?? "—"}</Field>
-                      <Field label="Версия">
-                        {issue.fixed_version?.name ?? "—"}
-                      </Field>
-                      <Field label="Начало">
-                        {issue.start_date ? formatDate(issue.start_date) : "—"}
-                      </Field>
-                      <Field label="Срок">
-                        {issue.due_date ? formatDate(issue.due_date) : "—"}
-                      </Field>
-                      <Field label="Обновлено">
-                        {formatDateTime(issue.updated_on)}
-                      </Field>
-                      <Field label="Оценка">
-                        {issue.estimated_hours != null
+              {!isEditing &&
+                (() => {
+                  // #40 - второстепенные поля: скрываем пустые, если не
+                  // включён "показать все". Проект/Автор/Исполнитель/
+                  // Обновлено/Готовность видны всегда.
+                  const optional: { label: string; value: string | null }[] = [
+                    {
+                      label: "Категория",
+                      value: issue.category?.name ?? null,
+                    },
+                    {
+                      label: "Версия",
+                      value: issue.fixed_version?.name ?? null,
+                    },
+                    {
+                      label: "Начало",
+                      value: issue.start_date
+                        ? formatDate(issue.start_date)
+                        : null,
+                    },
+                    {
+                      label: "Срок",
+                      value: issue.due_date ? formatDate(issue.due_date) : null,
+                    },
+                    {
+                      label: "Оценка",
+                      value:
+                        issue.estimated_hours != null
                           ? `${issue.estimated_hours} ч`
-                          : "—"}
-                      </Field>
-                      <Field label="Потрачено">
-                        {issue.spent_hours != null
-                          ? `${issue.spent_hours.toFixed(2)} ч`
-                          : "—"}
-                      </Field>
-                      {(issue.custom_fields ?? []).map((f) => (
-                        <Field key={f.id} label={f.name}>
-                          {formatCustomFieldValue(f, customFieldDefinitions)}
+                          : null,
+                    },
+                    {
+                      label: "Потрачено",
+                      value: issue.spent_hours
+                        ? `${issue.spent_hours.toFixed(2)} ч`
+                        : null,
+                    },
+                    ...(issue.custom_fields ?? []).map((f) => ({
+                      label: f.name,
+                      value:
+                        formatCustomFieldValue(f, customFieldDefinitions) || null,
+                    })),
+                  ];
+                  const hiddenCount = optional.filter(
+                    (f) => !f.value,
+                  ).length;
+                  const visible = optional.filter(
+                    (f) => showAllFields || f.value,
+                  );
+
+                  return (
+                    <Card>
+                      {hiddenCount > 0 && (
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <CardTitle className="text-xs font-normal text-muted-foreground">
+                            {showAllFields
+                              ? "Все поля"
+                              : `Скрыто пустых: ${hiddenCount}`}
+                          </CardTitle>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto px-1.5 py-0.5 text-xs text-muted-foreground"
+                            onClick={() => setShowAllFields((v) => !v)}
+                          >
+                            {showAllFields ? "Скрыть пустые" : "Показать все"}
+                          </Button>
+                        </CardHeader>
+                      )}
+                      <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-1">
+                        <Field label="Проект">
+                          {issue.project ? (
+                            <Link to="/issues" className="hover:underline">
+                              {issue.project.name}
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
                         </Field>
-                      ))}
-                      <div className="col-span-2 sm:col-span-3 lg:col-span-1">
-                        <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Готовность</span>
-                          <span>{issue.done_ratio}%</span>
+                        <Field label="Автор">{issue.author?.name ?? "—"}</Field>
+                        <Field label="Исполнитель">
+                          {issue.assigned_to?.name ?? "—"}
+                        </Field>
+                        <Field label="Обновлено">
+                          {formatDateTime(issue.updated_on)}
+                        </Field>
+                        {visible.map((f) => (
+                          <Field key={f.label} label={f.label}>
+                            {f.value ?? "—"}
+                          </Field>
+                        ))}
+                        <div className="col-span-2 sm:col-span-3 lg:col-span-1">
+                          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Готовность</span>
+                            <span>{issue.done_ratio}%</span>
+                          </div>
+                          <Progress value={issue.done_ratio} />
                         </div>
-                        <Progress value={issue.done_ratio} />
-                      </div>
-                    </CardContent>
-                  </Card>
-              )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
               <Card>
                 <CardHeader className="flex items-center justify-between border-b">
