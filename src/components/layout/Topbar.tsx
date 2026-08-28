@@ -1,4 +1,4 @@
-import { ChevronDown, Keyboard, Menu, Moon, Sun } from "lucide-react";
+import { Keyboard, Menu, Moon, Sun } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
 import { NotificationsBell, type NotificationsBellProps } from "@/components/layout/NotificationsBell";
 import type { Project } from "@/hooks/useProjects";
 import { getGravatarUrl } from "@/lib/gravatar";
@@ -56,8 +57,6 @@ export function Topbar({
 }: TopbarProps) {
   const navigate = useNavigate();
   const updater = useAppUpdater();
-  const currentProjectName =
-    projects.find((p) => p.id === selectedProjectId)?.name ?? "Все проекты";
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-3 sm:gap-4 sm:px-4">
@@ -78,34 +77,12 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="max-w-[8rem] gap-1.5 sm:max-w-none"
-              disabled={projectsLoading}
-            >
-              <span className="truncate">
-                {projectsLoading ? "Загрузка..." : currentProjectName}
-              </span>
-              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => onProjectChange(null)}>
-              Все проекты
-            </DropdownMenuItem>
-            {projects.map((project) => (
-              <DropdownMenuItem
-                key={project.id}
-                onSelect={() => onProjectChange(project.id)}
-              >
-                {project.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ProjectSwitcher
+          projects={projects}
+          loading={projectsLoading}
+          selectedProjectId={selectedProjectId}
+          onChange={onProjectChange}
+        />
 
         <NotificationsBell {...notifications} />
 

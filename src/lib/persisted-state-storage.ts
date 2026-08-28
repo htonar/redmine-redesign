@@ -3,6 +3,8 @@ export type PersistedStateKey =
   | "issues-filters"
   | "issues-layout"
   | "time-range"
+  | "time-period-unit"
+  | "time-period-offset"
   | "notification-settings";
 
 /**
