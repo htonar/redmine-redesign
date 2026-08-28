@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowDown,
@@ -48,6 +48,16 @@ import { useIssueViews } from "@/hooks/useIssueViews";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { useProjects } from "@/hooks/useProjects";
 import { useQueries } from "@/hooks/useQueries";
+import { useTrackers } from "@/hooks/useTrackers";
+import { useIssuePriorities } from "@/hooks/useIssuePriorities";
+import { useProjectVersions } from "@/hooks/useProjectVersions";
+import { useProjectMembers } from "@/hooks/useProjectMembers";
+import {
+  ActiveFilterChips,
+  EMPTY_ADVANCED_FILTERS,
+  IssueFilterPanel,
+  type AdvancedIssueFilters,
+} from "@/components/issues/IssueFilterPanel";
 import type { IssueListFilters } from "@/api/issues";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import { issueUrl } from "@/lib/redmine-url";
@@ -73,11 +83,13 @@ interface PersistedIssueFilters {
   status: IssueListFilters["status"];
   sort: string;
   queryId: number | null;
+  advanced: AdvancedIssueFilters;
 }
 
 const DEFAULT_PERSISTED_FILTERS: PersistedIssueFilters = {
   ...DEFAULT_FILTERS,
   queryId: null,
+  advanced: EMPTY_ADVANCED_FILTERS,
 };
 
 /** Сентинел для пункта "без query" в Select - Radix Select не допускает value="". */
@@ -116,12 +128,16 @@ export function IssuesPage() {
     DEFAULT_PERSISTED_FILTERS,
   );
   const { assignee, status, sort, queryId } = persistedFilters;
+  // advanced может отсутствовать в старом персисте (issue #29) - подстраховка.
+  const advanced = persistedFilters.advanced ?? EMPTY_ADVANCED_FILTERS;
   const setAssignee = (value: IssueListFilters["assignee"]) =>
     setPersistedFilters((prev) => ({ ...prev, assignee: value }));
   const setStatus = (value: IssueListFilters["status"]) =>
     setPersistedFilters((prev) => ({ ...prev, status: value }));
   const setSort = (value: string) =>
     setPersistedFilters((prev) => ({ ...prev, sort: value }));
+  const setAdvanced = (next: AdvancedIssueFilters) =>
+    setPersistedFilters((prev) => ({ ...prev, advanced: next }));
   // Нативный Query Redmine (issue #14) - когда выбран, Redmine игнорирует
   // остальные фильтры на сервере (project/assignee/status), поэтому UI их
   // дизейблит, а не позволяет думать, что они применяются одновременно.
@@ -143,6 +159,11 @@ export function IssuesPage() {
     status,
     sort,
     queryId: queryId ?? undefined,
+    trackerId: advanced.trackerId ?? undefined,
+    priorityId: advanced.priorityId ?? undefined,
+    versionId: advanced.versionId ?? undefined,
+    authorId: advanced.authorId ?? undefined,
+    subject: advanced.subject.trim() || undefined,
   };
 
   const {
@@ -157,6 +178,23 @@ export function IssuesPage() {
   const { views, save, remove } = useIssueViews(baseUrl, user?.id);
   const { projects } = useProjects(client);
   const { queries } = useQueries(client);
+  const { trackers } = useTrackers(client);
+  const { priorities } = useIssuePriorities(client);
+  const { versions } = useProjectVersions(client, selectedProjectId);
+  const { members } = useProjectMembers(client, selectedProjectId, user);
+
+  // Версия и автор привязаны к проекту - при смене проекта в шапке
+  // сбрасываем их, иначе остаётся id из чужого проекта и список молча пуст.
+  const prevProjectRef = useRef(selectedProjectId);
+  useEffect(() => {
+    if (prevProjectRef.current === selectedProjectId) return;
+    prevProjectRef.current = selectedProjectId;
+    if (advanced.versionId !== null || advanced.authorId !== null) {
+      setAdvanced({ ...advanced, versionId: null, authorId: null });
+    }
+    // setAdvanced - тонкая обёртка над сеттером persisted-стейта, не мемоизирована
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId, advanced]);
 
   const { field: sortField, dir: sortDir } = parseSort(sort);
 
@@ -170,6 +208,13 @@ export function IssuesPage() {
     setSort(view.filters.sort);
     setSelectedProjectId(view.filters.projectId ?? null);
     setQueryId(view.filters.queryId ?? null);
+    setAdvanced({
+      trackerId: view.filters.trackerId ?? null,
+      priorityId: view.filters.priorityId ?? null,
+      versionId: view.filters.versionId ?? null,
+      authorId: view.filters.authorId ?? null,
+      subject: view.filters.subject ?? "",
+    });
   }
 
   // Проекты, где у пользователя есть add_issues - и для решения "показывать ли
@@ -321,7 +366,31 @@ export function IssuesPage() {
             />
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {layout === "table" && (
+          <IssueFilterPanel
+            value={advanced}
+            onChange={setAdvanced}
+            trackers={trackers}
+            priorities={priorities}
+            versions={versions}
+            members={members}
+            projectSelected={selectedProjectId !== null}
+            disabled={queryId !== null}
+          />
+        )}
       </div>
+
+      {layout === "table" && queryId === null && (
+        <ActiveFilterChips
+          value={advanced}
+          onChange={setAdvanced}
+          trackers={trackers}
+          priorities={priorities}
+          versions={versions}
+          members={members}
+        />
+      )}
 
       {layout === "table" && queryId !== null && (
         <p className="text-sm text-muted-foreground">

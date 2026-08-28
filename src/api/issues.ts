@@ -18,6 +18,19 @@ export interface IssueListFilters {
    * списка задач.
    */
   watcher?: "me";
+  /** Фильтр по трекеру (`tracker_id`). */
+  trackerId?: number;
+  /** Фильтр по приоритету (`priority_id`). */
+  priorityId?: number;
+  /** Фильтр по целевой версии (`fixed_version_id`) - осмыслен при выбранном проекте. */
+  versionId?: number;
+  /** Фильтр по автору задачи (`author_id`). */
+  authorId?: number;
+  /**
+   * Поиск по теме - подстрокой. Отправляется как `subject=~text` (оператор
+   * "содержит" в синтаксисе фильтров Redmine). Пустая строка = без фильтра.
+   */
+  subject?: string;
   /** Формат Redmine: `field:desc`, например `updated_on:desc`. */
   sort: string;
   /**
@@ -68,6 +81,17 @@ export async function listIssues(
             assigned_to_id: params.assignee === "me" ? "me" : undefined,
             status_id: STATUS_QUERY[params.status],
             watcher_id: params.watcher === "me" ? "me" : undefined,
+            tracker_id: params.trackerId ? String(params.trackerId) : undefined,
+            priority_id: params.priorityId
+              ? String(params.priorityId)
+              : undefined,
+            fixed_version_id: params.versionId
+              ? String(params.versionId)
+              : undefined,
+            author_id: params.authorId ? String(params.authorId) : undefined,
+            subject: params.subject?.trim()
+              ? `~${params.subject.trim()}`
+              : undefined,
           },
     },
   });
