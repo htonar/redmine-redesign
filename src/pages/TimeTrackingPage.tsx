@@ -290,8 +290,10 @@ export function TimeTrackingPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Задача / проект</TableHead>
-                    <TableHead>Вид деятельности</TableHead>
-                    <TableHead>Комментарий</TableHead>
+                    <TableHead className="hidden sm:table-cell">
+                      Вид деятельности
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell">Комментарий</TableHead>
                     <TableHead className="text-right">Часы</TableHead>
                     <TableHead className="w-16" />
                   </TableRow>
@@ -306,9 +308,16 @@ export function TimeTrackingPage() {
                             {entry.project.name}
                           </span>
                         )}
+                        {entry.comments && (
+                          <div className="truncate text-xs font-normal text-muted-foreground md:hidden">
+                            {entry.comments}
+                          </div>
+                        )}
                       </TableCell>
-                      <TableCell>{entry.activity?.name ?? "-"}</TableCell>
-                      <TableCell className="max-w-xs truncate text-muted-foreground">
+                      <TableCell className="hidden sm:table-cell">
+                        {entry.activity?.name ?? "-"}
+                      </TableCell>
+                      <TableCell className="hidden max-w-xs truncate text-muted-foreground md:table-cell">
                         {entry.comments || "-"}
                       </TableCell>
                       <TableCell className="text-right">{entry.hours.toFixed(2)}</TableCell>

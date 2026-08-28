@@ -95,13 +95,17 @@ const DEFAULT_PERSISTED_FILTERS: PersistedIssueFilters = {
 /** Сентинел для пункта "без query" в Select - Radix Select не допускает value="". */
 const NO_QUERY = "__none__";
 
-const SORTABLE_COLUMNS: { field: string; label: string }[] = [
+/**
+ * `cellClass` прячет второстепенные колонки на узких экранах, чтобы таблица
+ * не уезжала в горизонтальный скролл. ID / Тема / Статус видны всегда.
+ */
+const SORTABLE_COLUMNS: { field: string; label: string; cellClass?: string }[] = [
   { field: "id", label: "ID" },
   { field: "subject", label: "Тема" },
-  { field: "tracker", label: "Трекер" },
-  { field: "priority", label: "Приоритет" },
+  { field: "tracker", label: "Трекер", cellClass: "hidden md:table-cell" },
+  { field: "priority", label: "Приоритет", cellClass: "hidden sm:table-cell" },
   { field: "status", label: "Статус" },
-  { field: "updated_on", label: "Обновлено" },
+  { field: "updated_on", label: "Обновлено", cellClass: "hidden lg:table-cell" },
 ];
 
 function formatDate(iso: string): string {
@@ -424,8 +428,8 @@ export function IssuesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                {SORTABLE_COLUMNS.map(({ field, label }) => (
-                  <TableHead key={field}>
+                {SORTABLE_COLUMNS.map(({ field, label, cellClass }) => (
+                  <TableHead key={field} className={cellClass}>
                     <button
                       type="button"
                       onClick={() => toggleSort(field)}
@@ -441,9 +445,9 @@ export function IssuesPage() {
                     </button>
                   </TableHead>
                 ))}
-                <TableHead>Проект</TableHead>
-                <TableHead>Исполнитель</TableHead>
-                <TableHead className="w-9" />
+                <TableHead className="hidden xl:table-cell">Проект</TableHead>
+                <TableHead className="hidden lg:table-cell">Исполнитель</TableHead>
+                <TableHead className="hidden w-9 sm:table-cell" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -458,7 +462,7 @@ export function IssuesPage() {
 
               {!isLoading && issues.length === 0 && !error && (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={9}>
                     <EmptyState
                       size="default"
                       title="Задач по этим фильтрам не найдено"
@@ -483,13 +487,15 @@ export function IssuesPage() {
                     <TableCell className="text-muted-foreground">
                       #{issue.id}
                     </TableCell>
-                    <TableCell className="max-w-xs truncate font-medium">
+                    <TableCell className="max-w-[45vw] truncate font-medium sm:max-w-xs">
                       {issue.subject}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
                       {issue.tracker?.name ?? "-"}
                     </TableCell>
-                    <TableCell>{issue.priority?.name ?? "-"}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {issue.priority?.name ?? "-"}
+                    </TableCell>
                     <TableCell>
                       {issue.status && (
                         <Badge
@@ -501,12 +507,16 @@ export function IssuesPage() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">
                       {formatDate(issue.updated_on)}
                     </TableCell>
-                    <TableCell>{issue.project?.name ?? "-"}</TableCell>
-                    <TableCell>{issue.assigned_to?.name ?? "-"}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden xl:table-cell">
+                      {issue.project?.name ?? "-"}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {issue.assigned_to?.name ?? "-"}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {baseUrl && (
                         <a
                           href={issueUrl(baseUrl, issue.id)}

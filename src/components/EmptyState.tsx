@@ -34,8 +34,12 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center text-center",
-        isCompact ? "gap-1 py-1" : "gap-2 py-10",
+        "flex flex-col justify-center",
+        // compact - инлайн внутри карточки: по левому краю, минимум отступов,
+        // чтобы пустые секции не смотрелись громоздко. default - по центру.
+        isCompact
+          ? "items-start gap-1 py-0.5 text-left"
+          : "items-center gap-2 py-10 text-center",
         className,
       )}
     >

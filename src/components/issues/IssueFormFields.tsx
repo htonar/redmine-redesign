@@ -242,7 +242,7 @@ export function IssueFormFields({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor={trackerId} className="mb-1.5">
             Трекер
@@ -317,7 +317,7 @@ export function IssueFormFields({
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor={categoryFieldId} className="mb-1.5">
             Категория
@@ -374,7 +374,7 @@ export function IssueFormFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor={startId} className="mb-1.5">
             Начало
@@ -399,7 +399,7 @@ export function IssueFormFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor={doneRatioId} className="mb-1.5">
             Готовность
