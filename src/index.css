@@ -18,7 +18,11 @@
  * sidebar-* - темно-синяя палитра левого сайдбара, отдельная от светлого контента.
  */
 :root {
-  --background: #ffffff;
+  /* Фон страницы - слегка серее белого, чтобы белые карточки на нём читались
+     как отдельные блоки (issue #31: раньше --background и --card были оба
+     #ffffff, карточки сливались с фоном). Соответствует docs/design.md
+     ("Фон контента #ffffff / #f7f8fb"). */
+  --background: #f4f5f9;
   --foreground: #1b2333;
 
   --card: #ffffff;
@@ -32,17 +36,17 @@
   --secondary: #eef1f6;
   --secondary-foreground: #1b2333;
 
-  --muted: #f7f8fb;
-  --muted-foreground: #8a93a6;
+  --muted: #eaecf3;
+  --muted-foreground: #7b8496;
 
-  --accent: #f2f4f8;
+  --accent: #eceef4;
   --accent-foreground: #1b2333;
 
   --destructive: #e6362c;
   --destructive-foreground: #ffffff;
 
-  --border: #e8eaf0;
-  --input: #e8eaf0;
+  --border: #e1e4ec;
+  --input: #e1e4ec;
   --ring: #2f6fed;
 
   --brand: #e6362c;

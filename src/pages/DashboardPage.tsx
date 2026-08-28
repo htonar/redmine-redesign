@@ -23,6 +23,10 @@ import { WeeklyTimeDebtWidget } from "@/components/time/WeeklyTimeDebtWidget";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
+import { useIssueStatuses } from "@/hooks/useIssueStatuses";
+import { useIssuePriorities } from "@/hooks/useIssuePriorities";
+import { useTrackers } from "@/hooks/useTrackers";
+import type { JournalValueMaps } from "@/lib/journal-format";
 import { useLayoutContext } from "./AppLayout";
 
 function formatDate(iso: string): string {
@@ -46,7 +50,7 @@ interface Counts {
  */
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { client, can } = useAuth();
+  const { client, can, user } = useAuth();
   const { selectedProjectId } = useLayoutContext();
   const [counts, setCounts] = useState<Counts | null>(null);
   const [recent, setRecent] = useState<IssueSummary[]>([]);
@@ -55,6 +59,25 @@ export function DashboardPage() {
   const activity = useActivityFeed(client, selectedProjectId ?? undefined);
   const { projects } = useProjects(client);
   const { activities } = useTimeEntryActivities(client);
+  const { statuses } = useIssueStatuses(client);
+  const { priorities } = useIssuePriorities(client);
+  const { trackers } = useTrackers(client);
+
+  // Карты id -> имя для истории в ленте активности (issue #30): без них
+  // ActivityFeed показывал `Исполнитель: — → 1` и т.п. вместо имён.
+  // status/priority/tracker - глобальные справочники; assigned_to - лента
+  // "по своим задачам", так что почти всегда "→ я", хотя бы это резолвим.
+  const journalValueMaps: JournalValueMaps = useMemo(
+    () => ({
+      status_id: Object.fromEntries(statuses.map((s) => [s.id, s.name])),
+      priority_id: Object.fromEntries(priorities.map((p) => [p.id, p.name])),
+      tracker_id: Object.fromEntries(trackers.map((t) => [t.id, t.name])),
+      assigned_to_id: user
+        ? { [user.id]: `${user.firstname} ${user.lastname}`.trim() }
+        : {},
+    }),
+    [statuses, priorities, trackers, user],
+  );
   // log_time - право за проект, виджету передаем уже отфильтрованный список
   // (см. TimeTrackingPage.tsx - тот же паттерн).
   const loggableProjects = useMemo(
@@ -217,7 +240,10 @@ export function DashboardPage() {
             </div>
           ) : (
             <ErrorBoundary title="Не удалось отобразить ленту активности">
-              <ActivityFeed entries={activity.entries} />
+              <ActivityFeed
+                entries={activity.entries}
+                valueMaps={journalValueMaps}
+              />
             </ErrorBoundary>
           )}
         </CardContent>

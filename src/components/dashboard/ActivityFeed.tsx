@@ -1,13 +1,16 @@
 import { useNavigate } from "react-router";
 import { JournalEntry } from "@/components/issues/JournalEntry";
 import type { ActivityEntry } from "@/hooks/useActivityFeed";
+import type { JournalValueMaps } from "@/lib/journal-format";
 
 interface ActivityFeedProps {
   entries: ActivityEntry[];
+  /** id -> имя для полей истории (статус/приоритет/трекер/исполнитель) - issue #30. */
+  valueMaps?: JournalValueMaps;
 }
 
 /** Лента изменений/комментариев по своим задачам - см. useActivityFeed. */
-export function ActivityFeed({ entries }: ActivityFeedProps) {
+export function ActivityFeed({ entries, valueMaps }: ActivityFeedProps) {
   const navigate = useNavigate();
 
   if (entries.length === 0) {
@@ -24,6 +27,7 @@ export function ActivityFeed({ entries }: ActivityFeedProps) {
         <JournalEntry
           key={entry.journal.id}
           journal={entry.journal}
+          valueMaps={valueMaps}
           header={
             <button
               type="button"
