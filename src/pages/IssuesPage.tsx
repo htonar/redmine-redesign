@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowDown,
   ArrowUp,
@@ -139,6 +139,25 @@ export function IssuesPage() {
     setPersistedFilters((prev) => ({ ...prev, status: value }));
   const setSort = (value: string) =>
     setPersistedFilters((prev) => ({ ...prev, sort: value }));
+
+  // Deep-link из stat-карточек дашборда (issue #54): ?assignee=&status=
+  // применяются один раз к персисту и убираются из URL, чтобы не перетирать
+  // выбор пользователя на каждый рендер.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const a = searchParams.get("assignee");
+    const s = searchParams.get("status");
+    if (!a && !s) return;
+    setPersistedFilters((prev) => ({
+      ...prev,
+      assignee: a === "me" || a === "all" ? a : prev.assignee,
+      status:
+        s === "open" || s === "closed" || s === "all" ? s : prev.status,
+      queryId: null,
+    }));
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const setAdvanced = (next: AdvancedIssueFilters) =>
     setPersistedFilters((prev) => ({ ...prev, advanced: next }));
   // Нативный Query Redmine (issue #14) - когда выбран, Redmine игнорирует
@@ -504,13 +523,21 @@ export function IssuesPage() {
                     // перемонтируются на каждый рендер, так что анимация не
                     // дёргается зря. motion-reduce - см. index.css.
                     className={cn(
-                      "cursor-pointer animate-in fade-in-0 duration-200 motion-reduce:animate-none",
+                      "relative cursor-pointer animate-in fade-in-0 duration-200 hover:bg-accent/50 motion-reduce:animate-none",
                       i === navIndex && "bg-accent",
                     )}
-                    onClick={() => navigate(`/issues/${issue.id}`)}
                   >
                     <TableCell className="text-muted-foreground">
-                      #{issue.id}
+                      {/* Растянутая ссылка на всю строку (issue #55): обычный
+                          клик - SPA-переход, Ctrl/Cmd/средняя кнопка и
+                          "Открыть в новой вкладке" работают нативно. */}
+                      <Link
+                        to={`/issues/${issue.id}`}
+                        className="after:absolute after:inset-0 after:content-['']"
+                        aria-label={`Открыть задачу #${issue.id}`}
+                      >
+                        #{issue.id}
+                      </Link>
                     </TableCell>
                     <TableCell className="max-w-[45vw] truncate font-medium sm:max-w-xs">
                       {issue.subject}
@@ -563,7 +590,7 @@ export function IssuesPage() {
                               openExternal(issueUrl(baseUrl, issue.id));
                             }
                           }}
-                          className="text-muted-foreground hover:text-foreground"
+                          className="relative z-10 text-muted-foreground hover:text-foreground"
                           aria-label="Открыть в Redmine"
                           title="Открыть в Redmine"
                         >

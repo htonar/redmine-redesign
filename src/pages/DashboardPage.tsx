@@ -163,11 +163,27 @@ export function DashboardPage() {
       )}
 
       {counts && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Мои открытые задачи" value={counts.myOpen} />
-          <StatCard label="Все открытые задачи" value={counts.allOpen} />
-          <StatCard label="Мои задачи всего" value={counts.myTotal} />
-          <StatCard label="Закрыто" value={counts.allClosed} />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            label="Мои открытые задачи"
+            value={counts.myOpen}
+            to="/issues?assignee=me&status=open"
+          />
+          <StatCard
+            label="Все открытые задачи"
+            value={counts.allOpen}
+            to="/issues?assignee=all&status=open"
+          />
+          <StatCard
+            label="Мои задачи всего"
+            value={counts.myTotal}
+            to="/issues?assignee=me&status=all"
+          />
+          <StatCard
+            label="Закрыто"
+            value={counts.allClosed}
+            to="/issues?assignee=all&status=closed"
+          />
         </div>
       )}
 
