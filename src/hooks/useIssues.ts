@@ -64,6 +64,17 @@ export function useIssues(client: RedmineClient | null, filters: IssueListFilter
     }
   }
 
+  /**
+   * Точечно обновить одну задачу в уже загруженном списке (issue #36 -
+   * инлайн-смена статуса/исполнителя): оптимистичный апдейт без перезапроса
+   * всего списка. `patch` мержится поверх текущей записи.
+   */
+  function patchIssue(id: number, patch: Partial<IssueSummary>) {
+    setIssues((prev) =>
+      prev.map((issue) => (issue.id === id ? { ...issue, ...patch } : issue)),
+    );
+  }
+
   return {
     issues,
     totalCount,
@@ -72,5 +83,6 @@ export function useIssues(client: RedmineClient | null, filters: IssueListFilter
     error,
     hasMore: issues.length < totalCount,
     loadMore,
+    patchIssue,
   };
 }

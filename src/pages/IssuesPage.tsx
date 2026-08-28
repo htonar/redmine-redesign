@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowDown,
@@ -61,7 +61,7 @@ import {
   IssueFilterPanel,
   type AdvancedIssueFilters,
 } from "@/components/issues/IssueFilterPanel";
-import type { IssueListFilters } from "@/api/issues";
+import { updateIssue, type IssueListFilters } from "@/api/issues";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import { issueUrl } from "@/lib/redmine-url";
 import { openExternal } from "@/lib/open-external";
@@ -101,6 +101,9 @@ const DEFAULT_PERSISTED_FILTERS: PersistedIssueFilters = {
 
 /** Сентинел для пункта "без query" в Select - Radix Select не допускает value="". */
 const NO_QUERY = "__none__";
+
+/** Сентинел для пункта "Не назначено" в инлайн-Select исполнителя (issue #36). */
+const UNASSIGNED = "__unassigned__";
 
 /**
  * `cellClass` прячет второстепенные колонки на узких экранах, чтобы таблица
@@ -196,6 +199,7 @@ export function IssuesPage() {
     error,
     hasMore,
     loadMore,
+    patchIssue,
   } = useIssues(client, filters);
   const { views, save, remove } = useIssueViews(baseUrl, user?.id);
   const { projects } = useProjects(client);
@@ -235,6 +239,33 @@ export function IssuesPage() {
 
   function toggleSort(field: string) {
     setSort(toggleSortValue(sort, field));
+  }
+
+  // Инлайн-правка статуса/исполнителя прямо в строке (issue #36) -
+  // оптимистично, с откатом при ошибке. Строка помечается id, пока идёт запрос.
+  const [inlineBusyId, setInlineBusyId] = useState<number | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+
+  async function inlinePatch(
+    id: number,
+    patch: { statusId: number } | { assignedToId: number | null },
+    optimistic: Partial<(typeof issues)[number]>,
+    rollback: Partial<(typeof issues)[number]>,
+  ) {
+    if (!client) return;
+    setInlineBusyId(id);
+    setInlineError(null);
+    patchIssue(id, optimistic);
+    try {
+      await updateIssue(client, id, patch);
+    } catch (e) {
+      patchIssue(id, rollback);
+      setInlineError(
+        e instanceof Error ? e.message : "Не удалось сохранить изменение.",
+      );
+    } finally {
+      setInlineBusyId(null);
+    }
   }
 
   function applyView(view: IssueView) {
@@ -448,6 +479,12 @@ export function IssuesPage() {
         </Alert>
       )}
 
+      {inlineError && (
+        <Alert variant="destructive">
+          <AlertDescription>{inlineError}</AlertDescription>
+        </Alert>
+      )}
+
       {layout === "kanban" &&
         (selectedProjectId === null ? (
           <div className="rounded-lg border border-border bg-card py-8 text-center text-muted-foreground">
@@ -554,13 +591,55 @@ export function IssuesPage() {
                       {issue.priority?.name ?? "-"}
                     </TableCell>
                     <TableCell>
-                      {issue.status && (
-                        <Badge
-                          variant="outline"
-                          className={statusBadgeClass(issue.status)}
+                      {can("edit_issues", issue.project?.id) &&
+                      statuses.length > 0 ? (
+                        <Select
+                          value={String(issue.status?.id ?? "")}
+                          disabled={inlineBusyId === issue.id}
+                          onValueChange={(v) => {
+                            const next = statuses.find(
+                              (s) => String(s.id) === v,
+                            );
+                            if (!next || next.id === issue.status?.id) return;
+                            const prev = issue.status;
+                            void inlinePatch(
+                              issue.id,
+                              { statusId: next.id },
+                              {
+                                status: {
+                                  id: next.id,
+                                  name: next.name,
+                                  is_closed: next.isClosed,
+                                },
+                              },
+                              { status: prev },
+                            );
+                          }}
                         >
-                          {issue.status.name}
-                        </Badge>
+                          <SelectTrigger
+                            size="sm"
+                            className="relative z-10 h-7 w-[8.5rem] border-transparent bg-transparent px-2 hover:bg-accent"
+                            aria-label="Статус задачи"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statuses.map((s) => (
+                              <SelectItem key={s.id} value={String(s.id)}>
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        issue.status && (
+                          <Badge
+                            variant="outline"
+                            className={statusBadgeClass(issue.status)}
+                          >
+                            {issue.status.name}
+                          </Badge>
+                        )
                       )}
                     </TableCell>
                     <TableCell
@@ -573,7 +652,66 @@ export function IssuesPage() {
                       {issue.project?.name ?? "-"}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      {issue.assigned_to?.name ?? "-"}
+                      {selectedProjectId &&
+                      members.length > 0 &&
+                      can("edit_issues", issue.project?.id) ? (
+                        <Select
+                          value={
+                            issue.assigned_to
+                              ? String(issue.assigned_to.id)
+                              : UNASSIGNED
+                          }
+                          disabled={inlineBusyId === issue.id}
+                          onValueChange={(v) => {
+                            const nextId = v === UNASSIGNED ? null : Number(v);
+                            if (nextId === (issue.assigned_to?.id ?? null)) return;
+                            const prev = issue.assigned_to;
+                            const nextMember = members.find(
+                              (m) => m.id === nextId,
+                            );
+                            void inlinePatch(
+                              issue.id,
+                              { assignedToId: nextId },
+                              {
+                                assigned_to: nextMember
+                                  ? { id: nextMember.id, name: nextMember.name }
+                                  : undefined,
+                              },
+                              { assigned_to: prev },
+                            );
+                          }}
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            className="relative z-10 h-7 w-[10rem] border-transparent bg-transparent px-2 hover:bg-accent"
+                            aria-label="Исполнитель задачи"
+                          >
+                            <SelectValue placeholder="Не назначено" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={UNASSIGNED}>
+                              Не назначено
+                            </SelectItem>
+                            {issue.assigned_to &&
+                              !members.some(
+                                (m) => m.id === issue.assigned_to!.id,
+                              ) && (
+                                <SelectItem
+                                  value={String(issue.assigned_to.id)}
+                                >
+                                  {issue.assigned_to.name}
+                                </SelectItem>
+                              )}
+                            {members.map((m) => (
+                              <SelectItem key={m.id} value={String(m.id)}>
+                                {m.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        (issue.assigned_to?.name ?? "-")
+                      )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {baseUrl && (

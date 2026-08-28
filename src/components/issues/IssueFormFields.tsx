@@ -193,6 +193,11 @@ export interface IssueFormFieldsProps {
   versions: ProjectVersion[];
   /** Тема - обязательное поле, единственное, которое здесь валидируется визуально. */
   subjectRequired?: boolean;
+  /**
+   * У задачи есть подзадачи - Redmine может считать готовность по ним и
+   * игнорировать ручной ввод (issue #62). Тогда поле дизейблим с подсказкой.
+   */
+  doneRatioDerived?: boolean;
   /** Для вставки файлов по Ctrl+V в описание (MarkdownEditor) - см. CLAUDE.md, "Markdown-редактор". */
   client: RedmineClient | null;
   onDescriptionUpload?: (file: UploadedFile) => void;
@@ -214,6 +219,7 @@ export function IssueFormFields({
   categories,
   versions,
   subjectRequired,
+  doneRatioDerived,
   client,
   onDescriptionUpload,
 }: IssueFormFieldsProps) {
@@ -416,6 +422,7 @@ export function IssueFormFields({
           <Select
             value={String(values.doneRatio)}
             onValueChange={(v) => onChange("doneRatio", Number(v))}
+            disabled={doneRatioDerived}
           >
             <SelectTrigger id={doneRatioId} className="w-full">
               <SelectValue />
@@ -428,6 +435,11 @@ export function IssueFormFields({
               ))}
             </SelectContent>
           </Select>
+          {doneRatioDerived && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Считается по подзадачам, если это включено в настройках Redmine.
+            </p>
+          )}
         </div>
         <div>
           <Label htmlFor={estimatedId} className="mb-1.5">

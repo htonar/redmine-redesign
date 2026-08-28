@@ -134,6 +134,12 @@ export interface WeeklyTimeDebtWidgetProps {
   activities: TimeEntryActivity[];
   defaultProjectId?: number | null;
   onLogTime: (input: TimeEntryInput) => Promise<void>;
+  /**
+   * Управляемое смещение недели (issue #64): когда задано, виджет не рисует
+   * свои ◀/▶ - неделей рулит контрол периода на странице учёта времени.
+   * Не задано (дашборд) - виджет сам по себе, со своими стрелками.
+   */
+  weekOffset?: number;
 }
 
 /**
@@ -149,8 +155,11 @@ export function WeeklyTimeDebtWidget({
   activities,
   defaultProjectId,
   onLogTime,
+  weekOffset: controlledWeekOffset,
 }: WeeklyTimeDebtWidgetProps) {
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [ownWeekOffset, setOwnWeekOffset] = useState(0);
+  const controlled = controlledWeekOffset !== undefined;
+  const weekOffset = controlled ? controlledWeekOffset : ownWeekOffset;
   const { days, totalDeficit, rangeLabel, isLoading, error, reload } =
     useWeeklyTimeDebt(client, weekOffset);
 
@@ -169,26 +178,30 @@ export function WeeklyTimeDebtWidget({
         <CardTitle>
           {weekOffset === 0 ? "Трудозатраты на этой неделе" : "Трудозатраты за неделю"}
         </CardTitle>
-        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Предыдущая неделя"
-            onClick={() => setWeekOffset((o) => o - 1)}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="min-w-28 text-center text-xs">{rangeLabel}</span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Следующая неделя"
-            disabled={weekOffset >= 0}
-            onClick={() => setWeekOffset((o) => o + 1)}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
+        {controlled ? (
+          <span className="text-xs text-muted-foreground">{rangeLabel}</span>
+        ) : (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Предыдущая неделя"
+              onClick={() => setOwnWeekOffset((o) => o - 1)}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="min-w-28 text-center text-xs">{rangeLabel}</span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Следующая неделя"
+              disabled={weekOffset >= 0}
+              onClick={() => setOwnWeekOffset((o) => o + 1)}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {error && (

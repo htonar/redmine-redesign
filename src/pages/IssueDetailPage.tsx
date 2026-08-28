@@ -1054,6 +1054,7 @@ export function IssueDetailPage() {
                       categories={categories}
                       versions={versions}
                       subjectRequired
+                      doneRatioDerived={(issue.children?.length ?? 0) > 0}
                       client={client}
                       onDescriptionUpload={(f) =>
                         setPendingDescriptionUploads((prev) => [...prev, f])
@@ -1611,6 +1612,7 @@ export function IssueDetailPage() {
                     issue.due_date,
                     issue.status?.is_closed ?? false,
                   );
+                  const hasSubtasks = (issue.children?.length ?? 0) > 0;
                   const optional: {
                     label: string;
                     value: string | null;
@@ -1719,6 +1721,12 @@ export function IssueDetailPage() {
                             <span>{issue.done_ratio}%</span>
                           </div>
                           <Progress value={issue.done_ratio} />
+                          {hasSubtasks && (
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              Может рассчитываться по подзадачам - тогда
+                              ручное значение Redmine игнорирует.
+                            </p>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

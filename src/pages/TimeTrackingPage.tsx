@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -41,15 +49,17 @@ import { canManageTimeEntry } from "@/lib/time-entry-permissions";
 import { timeEntriesToCsv } from "@/lib/time-entries-csv";
 import { CSV_BOM } from "@/lib/csv";
 import { saveBlobAs } from "@/lib/save-file";
+import {
+  resolvePeriod,
+  widgetWeekOffset,
+  type PeriodUnit,
+} from "@/lib/time-period";
 import { useLayoutContext } from "./AppLayout";
 
-type RangeValue = NonNullable<TimeEntryListFilters["spentOn"]> | "all";
-
-const RANGE_OPTIONS: { value: RangeValue; label: string }[] = [
-  { value: "t", label: "Сегодня" },
-  { value: "w", label: "Эта неделя" },
-  { value: "m", label: "Этот месяц" },
-  { value: "all", label: "Все время" },
+const UNIT_OPTIONS: { value: PeriodUnit; label: string }[] = [
+  { value: "week", label: "Неделя" },
+  { value: "month", label: "Месяц" },
+  { value: "all", label: "Всё время" },
 ];
 
 function parseIsoDate(iso: string): Date {
@@ -117,20 +127,39 @@ export function TimeTrackingPage() {
     [projects, can],
   );
   const [scope, setScope] = useState<TimeEntryListFilters["scope"]>("me");
-  const [range, setRange] = usePersistedState<RangeValue>(
+  // Единый контрол периода (issue #64): единица + смещение, оба persisted.
+  // Тот же период применяется и к списку записей, и к виджету долга.
+  const [periodUnit, setPeriodUnit] = usePersistedState<PeriodUnit>(
     baseUrl,
     user?.id,
-    "time-range",
-    "w",
+    "time-period-unit",
+    "week",
+  );
+  const [periodOffset, setPeriodOffset] = usePersistedState<number>(
+    baseUrl,
+    user?.id,
+    "time-period-offset",
+    0,
   );
   const [deleteTarget, setDeleteTarget] = useState<TimeEntry | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const period = useMemo(
+    () => resolvePeriod(periodUnit, periodOffset),
+    [periodUnit, periodOffset],
+  );
+
   const filters: TimeEntryListFilters = {
     scope,
     projectId: selectedProjectId ?? undefined,
-    spentOn: range === "all" ? undefined : range,
+    from: period.from,
+    to: period.to,
   };
+
+  function changeUnit(unit: PeriodUnit) {
+    setPeriodUnit(unit);
+    setPeriodOffset(0);
+  }
 
   const { entries, totalCount, isLoading, isLoadingMore, error, hasMore, loadMore, reload } =
     useTimeEntries(client, filters);
@@ -191,6 +220,7 @@ export function TimeTrackingPage() {
         activities={activities}
         defaultProjectId={selectedProjectId}
         onLogTime={handleCreate}
+        weekOffset={widgetWeekOffset(periodUnit, periodOffset)}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -205,18 +235,46 @@ export function TimeTrackingPage() {
             </SelectContent>
           </Select>
 
-          <Select value={range} onValueChange={(v) => setRange(v as RangeValue)}>
-            <SelectTrigger className="w-40">
+          <Select
+            value={periodUnit}
+            onValueChange={(v) => changeUnit(v as PeriodUnit)}
+          >
+            <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {RANGE_OPTIONS.map((opt) => (
+              {UNIT_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          {periodUnit !== "all" && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Предыдущий период"
+                onClick={() => setPeriodOffset((o) => o - 1)}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="min-w-32 text-center text-sm text-muted-foreground">
+                {period.label}
+              </span>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Следующий период"
+                disabled={periodOffset >= 0}
+                onClick={() => setPeriodOffset((o) => o + 1)}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -262,7 +320,10 @@ export function TimeTrackingPage() {
               {loadedHours.toFixed(2)} ч
             </span>
             <span className="text-sm text-muted-foreground">
-              по {entries.length} из {totalCount} записей
+              {periodUnit === "all" ? "всего" : `итого за период (${period.label})`}
+              {" · "}
+              {entries.length}
+              {hasMore ? ` из ${totalCount}` : ""} записей
             </span>
           </CardContent>
         </Card>
