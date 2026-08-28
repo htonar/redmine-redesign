@@ -72,6 +72,7 @@ import { AttachmentPreviewDialog } from "@/components/issues/AttachmentPreviewDi
 import { addWatcher, removeWatcher } from "@/api/watchers";
 import { JournalEntry } from "@/components/issues/JournalEntry";
 import { IssuePicker } from "@/components/issues/IssuePicker";
+import { BranchNameButton } from "@/components/issues/BranchNameButton";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 import { MarkdownEditor } from "@/components/markdown/MarkdownEditor";
 import {
@@ -837,6 +838,12 @@ export function IssueDetailPage() {
               </h1>
             </div>
             <div className="flex items-center gap-2">
+              <BranchNameButton
+                issueId={issue.id}
+                subject={issue.subject}
+                trackerName={issue.tracker?.name}
+                projectIdentifier={issue.project?.name}
+              />
               {!isEditing && can("edit_issues", projectId) && (
                 <Button
                   variant="outline"
