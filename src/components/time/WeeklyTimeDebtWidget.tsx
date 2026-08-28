@@ -53,7 +53,9 @@ function DayBar({ day, client, projects, activities, defaultProjectId, onLogTime
           // залогированного дня дорожка была практически невидима, только
           // подпись "0.0ч" намекала, что тут вообще есть столбик (найдено
           // на аудите тёмной темы, GitHub issue #10).
-          "relative flex w-9 items-end overflow-hidden rounded-t-md bg-foreground/10",
+          // after: базовая линия по низу - дорожка читается как ось графика,
+          // а не как наполовину пустой «сломанный» столбик (issue #51).
+          "relative flex w-9 items-end overflow-hidden rounded-t-md bg-foreground/10 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-border",
           day.isFuture && "opacity-50",
         )}
         style={{ height: BAR_HEIGHT_PX }}

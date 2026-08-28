@@ -10,10 +10,13 @@ import {
 import { Link, useNavigate, useParams } from "react-router";
 import {
   ArrowLeft,
+  Check,
+  Copy,
   Eye,
   EyeOff,
   ExternalLink,
   Loader2,
+  MoreHorizontal,
   Paperclip,
   Pencil,
   Plus,
@@ -22,6 +25,13 @@ import {
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -294,6 +304,7 @@ export function IssueDetailPage() {
   >([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [parentInput, setParentInput] = useState<number | null>(null);
   const [isEditingParent, setIsEditingParent] = useState(false);
@@ -719,6 +730,17 @@ export function IssueDetailPage() {
     }
   }
 
+  async function handleCopyLink() {
+    if (!baseUrl || !issue) return;
+    try {
+      await navigator.clipboard.writeText(issueUrl(baseUrl, issue.id));
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* буфер недоступен - молча, ссылка и так открывается пунктом выше */
+    }
+  }
+
   async function handleStatusChange(statusId: string) {
     if (!client || !issue) return;
     setIsSavingStatus(true);
@@ -861,26 +883,6 @@ export function IssueDetailPage() {
                 <span>
                   {issue.tracker?.name ?? "Задача"} #{issue.id}
                 </span>
-                {baseUrl && (
-                  <a
-                    href={issueUrl(baseUrl, issue.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => {
-                      // Tauri webview не открывает системный браузер сам -
-                      // issue #24.
-                      if (isTauri()) {
-                        e.preventDefault();
-                        openExternal(issueUrl(baseUrl, issue.id));
-                      }
-                    }}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Открыть в Redmine"
-                    title="Открыть в Redmine"
-                  >
-                    <ExternalLink className="size-3.5" />
-                  </a>
-                )}
               </div>
               <h1 className="text-xl font-semibold tracking-tight">
                 {issue.subject}
@@ -920,22 +922,66 @@ export function IssueDetailPage() {
                   }
                 />
               )}
-              {can("delete_issues", projectId) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-destructive hover:text-destructive"
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-3.5" />
+              {/* Второстепенные и деструктивные действия - в "…"-меню (issue
+                  #61), чтобы "Удалить" не стояло вплотную к частым кнопкам. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="px-2"
+                    aria-label="Ещё действия"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {baseUrl && (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        const url = issueUrl(baseUrl, issue.id);
+                        if (isTauri()) openExternal(url);
+                        else window.open(url, "_blank", "noreferrer");
+                      }}
+                    >
+                      <ExternalLink className="size-3.5" />
+                      Открыть в Redmine
+                    </DropdownMenuItem>
                   )}
-                  Удалить
-                </Button>
-              )}
+                  {baseUrl && (
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        void handleCopyLink();
+                      }}
+                    >
+                      {linkCopied ? (
+                        <Check className="size-3.5" />
+                      ) : (
+                        <Copy className="size-3.5" />
+                      )}
+                      {linkCopied ? "Скопировано" : "Копировать ссылку"}
+                    </DropdownMenuItem>
+                  )}
+                  {can("delete_issues", projectId) && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={isDeleting}
+                        onSelect={() => setIsDeleteDialogOpen(true)}
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-3.5" />
+                        )}
+                        Удалить
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               {issue.priority?.name && (
                 // h-8 px-3 - у Badge своя высота (h-5), заметно меньше
                 // соседних кнопок/селекта (h-8) в этом ряду - на аудите
