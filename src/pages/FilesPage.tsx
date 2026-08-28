@@ -62,7 +62,10 @@ function downloadUrl(file: ProjectFile): string {
 export function FilesPage() {
   const { client, can } = useAuth();
   const { selectedProjectId } = useLayoutContext();
-  const { files, isLoading, error, reload } = useFiles(client, selectedProjectId);
+  const { files, isLoading, error, errorKind, reload } = useFiles(
+    client,
+    selectedProjectId,
+  );
   const { versions } = useProjectVersions(client, selectedProjectId);
   const [deleteTarget, setDeleteTarget] = useState<ProjectFile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -114,8 +117,20 @@ export function FilesPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+        <Alert variant={errorKind === "module-disabled" ? "default" : "destructive"}>
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span>{error}</span>
+            {errorKind !== "module-disabled" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={reload}
+              >
+                Повторить
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 

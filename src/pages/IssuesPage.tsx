@@ -67,6 +67,8 @@ import { issueUrl } from "@/lib/redmine-url";
 import { openExternal } from "@/lib/open-external";
 import { cn } from "@/lib/utils";
 import { useListKeyboardNav } from "@/hooks/useListKeyboardNav";
+import { priorityTextClass, statusBadgeClass } from "@/lib/issue-visuals";
+import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 import { isTauri } from "@tauri-apps/api/core";
 import type { IssueView } from "@/lib/issue-views-storage";
 import { useLayoutContext } from "./AppLayout";
@@ -112,14 +114,6 @@ const SORTABLE_COLUMNS: { field: string; label: string; cellClass?: string }[] =
   { field: "status", label: "Статус" },
   { field: "updated_on", label: "Обновлено", cellClass: "hidden lg:table-cell" },
 ];
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 /**
  * Список задач: фильтры (проект - в Topbar, исполнитель, статус), сортировка,
@@ -524,22 +518,29 @@ export function IssuesPage() {
                     <TableCell className="hidden text-muted-foreground md:table-cell">
                       {issue.tracker?.name ?? "-"}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
+                    <TableCell
+                      className={cn(
+                        "hidden font-medium sm:table-cell",
+                        priorityTextClass(issue.priority?.name),
+                      )}
+                    >
                       {issue.priority?.name ?? "-"}
                     </TableCell>
                     <TableCell>
                       {issue.status && (
                         <Badge
-                          variant={
-                            issue.status.is_closed ? "secondary" : "default"
-                          }
+                          variant="outline"
+                          className={statusBadgeClass(issue.status)}
                         >
                           {issue.status.name}
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="hidden text-muted-foreground lg:table-cell">
-                      {formatDate(issue.updated_on)}
+                    <TableCell
+                      className="hidden text-muted-foreground lg:table-cell"
+                      title={fullTimestamp(issue.updated_on)}
+                    >
+                      {formatRelativeTime(issue.updated_on)}
                     </TableCell>
                     <TableCell className="hidden xl:table-cell">
                       {issue.project?.name ?? "-"}

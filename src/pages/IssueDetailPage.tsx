@@ -80,7 +80,8 @@ import {
   RELATION_TYPE_OPTIONS,
   describeIssueRelation,
 } from "@/lib/issue-relations";
-import { formatDateTime } from "@/lib/journal-format";
+import { dueDateState } from "@/lib/issue-visuals";
+import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 import { formatFileSize } from "@/lib/utils";
 import { celebrate } from "@/lib/celebrate";
 import { diffFormValues, formatCustomFieldValue } from "@/lib/issue-form";
@@ -1560,7 +1561,15 @@ export function IssueDetailPage() {
                   // #40 - второстепенные поля: скрываем пустые, если не
                   // включён "показать все". Проект/Автор/Исполнитель/
                   // Обновлено/Готовность видны всегда.
-                  const optional: { label: string; value: string | null }[] = [
+                  const due = dueDateState(
+                    issue.due_date,
+                    issue.status?.is_closed ?? false,
+                  );
+                  const optional: {
+                    label: string;
+                    value: string | null;
+                    className?: string;
+                  }[] = [
                     {
                       label: "Категория",
                       value: issue.category?.name ?? null,
@@ -1578,6 +1587,12 @@ export function IssueDetailPage() {
                     {
                       label: "Срок",
                       value: issue.due_date ? formatDate(issue.due_date) : null,
+                      className:
+                        due === "overdue"
+                          ? "text-red-600 dark:text-red-400 font-medium"
+                          : due === "soon"
+                            ? "text-orange-600 dark:text-orange-400 font-medium"
+                            : undefined,
                     },
                     {
                       label: "Оценка",
@@ -1639,11 +1654,17 @@ export function IssueDetailPage() {
                           {issue.assigned_to?.name ?? "—"}
                         </Field>
                         <Field label="Обновлено">
-                          {formatDateTime(issue.updated_on)}
+                          <span title={fullTimestamp(issue.updated_on)}>
+                            {formatRelativeTime(issue.updated_on)}
+                          </span>
                         </Field>
                         {visible.map((f) => (
                           <Field key={f.label} label={f.label}>
-                            {f.value ?? "—"}
+                            {f.value ? (
+                              <span className={f.className}>{f.value}</span>
+                            ) : (
+                              "—"
+                            )}
                           </Field>
                         ))}
                         <div className="col-span-2 sm:col-span-3 lg:col-span-1">

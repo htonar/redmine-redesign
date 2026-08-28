@@ -26,6 +26,7 @@ import { WeeklyTimeDebtWidget } from "@/components/time/WeeklyTimeDebtWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { useProjects } from "@/hooks/useProjects";
+import { useIssueSummaries } from "@/hooks/useIssueSummaries";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
 import {
@@ -135,6 +136,20 @@ export function TimeTrackingPage() {
     useTimeEntries(client, filters);
 
   const groups = useMemo(() => groupByDay(entries), [entries]);
+  // API отдает по записи только issue.id без темы - подтягиваем темы пачкой,
+  // чтобы в таблице был человекочитаемый заголовок, а не голый "#123".
+  const issueIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          entries
+            .map((e) => e.issue?.id)
+            .filter((id): id is number => typeof id === "number"),
+        ),
+      ),
+    [entries],
+  );
+  const issueSummaries = useIssueSummaries(client, issueIds);
   const loadedHours = useMemo(() => entries.reduce((sum, e) => sum + e.hours, 0), [entries]);
 
   async function handleCreate(input: TimeEntryInput) {
@@ -302,7 +317,16 @@ export function TimeTrackingPage() {
                   {group.entries.map((entry) => (
                     <TableRow key={entry.id}>
                       <TableCell className="font-medium">
-                        {entry.issue ? `#${entry.issue.id}` : (entry.project?.name ?? "-")}
+                        {entry.issue ? (
+                          <>
+                            <span className="text-muted-foreground">
+                              #{entry.issue.id}
+                            </span>{" "}
+                            {issueSummaries[entry.issue.id]?.subject ?? ""}
+                          </>
+                        ) : (
+                          (entry.project?.name ?? "-")
+                        )}
                         {entry.issue && entry.project && (
                           <span className="ml-1.5 font-normal text-muted-foreground">
                             {entry.project.name}

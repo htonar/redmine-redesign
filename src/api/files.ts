@@ -3,13 +3,32 @@ import type { components } from "@/api/schema";
 
 export type ProjectFile = components["schemas"]["file"];
 
+/** kind: "module-disabled" - у проекта выключен модуль "Файлы" (403/404). */
+export class FilesError extends Error {
+  kind: "module-disabled" | "generic";
+  constructor(kind: "module-disabled" | "generic", message: string) {
+    super(message);
+    this.name = "FilesError";
+    this.kind = kind;
+  }
+}
+
 export async function listFiles(client: RedmineClient, projectId: number): Promise<ProjectFile[]> {
-  const { data, error } = await client.GET("/projects/{project_id}/files.{format}", {
-    params: { path: { format: "json", project_id: projectId } },
-  });
+  const { data, error, response } = await client.GET(
+    "/projects/{project_id}/files.{format}",
+    {
+      params: { path: { format: "json", project_id: projectId } },
+    },
+  );
 
   if (error || !data) {
-    throw new Error("Не удалось загрузить список файлов.");
+    if (response?.status === 403 || response?.status === 404) {
+      throw new FilesError(
+        "module-disabled",
+        "В этом проекте выключен модуль «Файлы». Включите его в настройках проекта в Redmine.",
+      );
+    }
+    throw new FilesError("generic", "Не удалось загрузить список файлов.");
   }
 
   return data.files;

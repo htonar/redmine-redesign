@@ -4,11 +4,11 @@ import type { Attachment } from "@/api/attachments";
 import type { RedmineClient } from "@/api/client";
 import {
   FIELD_LABELS,
-  formatDateTime,
   resolveJournalFieldValue,
   type JournalValueMaps,
 } from "@/lib/journal-format";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
+import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 
 interface JournalEntryProps {
   journal: NonNullable<Issue["journals"]>[number];
@@ -60,7 +60,9 @@ export function JournalEntry({
         <span className="font-medium text-foreground">
           {journal.user?.name ?? "Кто-то"}
         </span>
-        {formatDateTime(journal.created_on)}
+        <span title={fullTimestamp(journal.created_on)}>
+          {formatRelativeTime(journal.created_on)}
+        </span>
       </div>
       {journal.notes && (
         <MarkdownContent
