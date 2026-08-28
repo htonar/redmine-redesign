@@ -198,6 +198,12 @@ export interface IssueFormFieldsProps {
    * игнорировать ручной ввод (issue #62). Тогда поле дизейблим с подсказкой.
    */
   doneRatioDerived?: boolean;
+  /**
+   * Компактный режим для создания задачи (issue #60): сверху только Тема +
+   * Описание, остальное под "Дополнительно ▾"; Готовность/Оценку не
+   * показываем вовсе (задаются после создания).
+   */
+  compact?: boolean;
   /** Для вставки файлов по Ctrl+V в описание (MarkdownEditor) - см. CLAUDE.md, "Markdown-редактор". */
   client: RedmineClient | null;
   onDescriptionUpload?: (file: UploadedFile) => void;
@@ -220,6 +226,7 @@ export function IssueFormFields({
   versions,
   subjectRequired,
   doneRatioDerived,
+  compact,
   client,
   onDescriptionUpload,
 }: IssueFormFieldsProps) {
@@ -235,19 +242,22 @@ export function IssueFormFields({
   const estimatedId = useId();
   const descriptionId = useId();
 
-  return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <Label htmlFor={subjectId} className="mb-1.5">
-          Тема{subjectRequired && " *"}
-        </Label>
-        <Input
-          id={subjectId}
-          value={values.subject}
-          onChange={(e) => onChange("subject", e.target.value)}
-          placeholder="Коротко, о чем задача"
-        />
-      </div>
+  const subjectBlock = (
+    <div>
+      <Label htmlFor={subjectId} className="mb-1.5">
+        Тема{subjectRequired && " *"}
+      </Label>
+      <Input
+        id={subjectId}
+        value={values.subject}
+        onChange={(e) => onChange("subject", e.target.value)}
+        placeholder="Коротко, о чем задача"
+      />
+    </div>
+  );
+
+  const restBlocks = (
+    <>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
@@ -414,84 +424,116 @@ export function IssueFormFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor={doneRatioId} className="mb-1.5">
-            Готовность
-          </Label>
-          <Select
-            value={String(values.doneRatio)}
-            onValueChange={(v) => onChange("doneRatio", Number(v))}
-            disabled={doneRatioDerived}
-          >
-            <SelectTrigger id={doneRatioId} className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DONE_RATIO_STEPS.map((step) => (
-                <SelectItem key={step} value={String(step)}>
-                  {step}%
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {doneRatioDerived && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Считается по подзадачам, если это включено в настройках Redmine.
-            </p>
-          )}
-        </div>
-        <div>
-          <Label htmlFor={estimatedId} className="mb-1.5">
-            Оценка часов
-          </Label>
-          <Input
-            id={estimatedId}
-            type="number"
-            min={0}
-            step={0.5}
-            placeholder="Необязательно"
-            value={values.estimatedHours}
-            onChange={(e) => onChange("estimatedHours", e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor={descriptionId} className="mb-1.5">
-          Описание
-        </Label>
-        <MarkdownEditor
-          id={descriptionId}
-          client={client}
-          rows={5}
-          value={values.description}
-          onChange={(v) => onChange("description", v)}
-          onUpload={onDescriptionUpload}
-          placeholder="Необязательно"
-        />
-      </div>
-
-      {values.customFields.length > 0 && (
-        <div className="flex flex-col gap-3 border-t border-border pt-3">
-          <div className="text-xs font-medium text-muted-foreground">
-            Дополнительные поля
+      {!compact && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <Label htmlFor={doneRatioId} className="mb-1.5">
+              Готовность
+            </Label>
+            <Select
+              value={String(values.doneRatio)}
+              onValueChange={(v) => onChange("doneRatio", Number(v))}
+              disabled={doneRatioDerived}
+            >
+              <SelectTrigger id={doneRatioId} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DONE_RATIO_STEPS.map((step) => (
+                  <SelectItem key={step} value={String(step)}>
+                    {step}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {doneRatioDerived && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Считается по подзадачам, если это включено в настройках Redmine.
+              </p>
+            )}
           </div>
-          {values.customFields.map((field, i) => (
-            <div key={field.id}>
-              <Label className="mb-1.5">{field.name}</Label>
-              <CustomFieldInput
-                field={field}
-                onChange={(value) => {
-                  const next = values.customFields.slice();
-                  next[i] = { ...field, value };
-                  onChange("customFields", next);
-                }}
-              />
-            </div>
-          ))}
+          <div>
+            <Label htmlFor={estimatedId} className="mb-1.5">
+              Оценка часов
+            </Label>
+            <Input
+              id={estimatedId}
+              type="number"
+              min={0}
+              step={0.5}
+              placeholder="Необязательно"
+              value={values.estimatedHours}
+              onChange={(e) => onChange("estimatedHours", e.target.value)}
+            />
+          </div>
         </div>
       )}
+
+    </>
+  );
+
+  const customFieldsBlock = values.customFields.length > 0 && (
+    <div className="flex flex-col gap-3 border-t border-border pt-3">
+      <div className="text-xs font-medium text-muted-foreground">
+        Дополнительные поля
+      </div>
+      {values.customFields.map((field, i) => (
+        <div key={field.id}>
+          <Label className="mb-1.5">{field.name}</Label>
+          <CustomFieldInput
+            field={field}
+            onChange={(value) => {
+              const next = values.customFields.slice();
+              next[i] = { ...field, value };
+              onChange("customFields", next);
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+
+  const descriptionBlock = (
+    <div>
+      <Label htmlFor={descriptionId} className="mb-1.5">
+        Описание
+      </Label>
+      <MarkdownEditor
+        id={descriptionId}
+        client={client}
+        rows={5}
+        value={values.description}
+        onChange={(v) => onChange("description", v)}
+        onUpload={onDescriptionUpload}
+        placeholder="Необязательно"
+      />
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <div className="flex flex-col gap-3">
+        {subjectBlock}
+        {descriptionBlock}
+        <details className="rounded-lg border border-border">
+          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-muted-foreground select-none">
+            Дополнительно
+          </summary>
+          <div className="flex flex-col gap-3 border-t border-border p-3">
+            {restBlocks}
+            {customFieldsBlock}
+          </div>
+        </details>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {subjectBlock}
+      {restBlocks}
+      {descriptionBlock}
+      {customFieldsBlock}
     </div>
   );
 }
