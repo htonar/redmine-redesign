@@ -53,6 +53,8 @@ export interface LogTimeDialogProps {
   defaultIssueId?: number;
   /** Дата по умолчанию для новой записи (YYYY-MM-DD) - например, день с недотрекой из WeeklyTimeDebtWidget. Игнорируется в режиме правки (там дата из initial). */
   defaultSpentOn?: string;
+  /** Часы по умолчанию для новой записи - например, наработка таймера (issue #34). */
+  defaultHours?: number;
   /** Если задано - форма открывается в режиме правки существующей записи. */
   initial?: LogTimeDialogInitial;
   onSubmit: (input: TimeEntryInput) => Promise<void>;
@@ -85,6 +87,7 @@ export function LogTimeDialog({
   defaultProjectId,
   defaultIssueId,
   defaultSpentOn,
+  defaultHours,
   initial,
   onSubmit,
   open: controlledOpen,
@@ -114,7 +117,13 @@ export function LogTimeDialog({
     setIssueId(initial?.issueId ?? defaultIssueId ?? null);
     setProjectId(initial?.projectId ?? defaultProjectId ?? null);
     setSpentOn(initial?.spentOn ?? defaultSpentOn ?? todayIsoDate());
-    setHours(initial?.hours !== undefined ? String(initial.hours) : "");
+    setHours(
+      initial?.hours !== undefined
+        ? String(initial.hours)
+        : defaultHours !== undefined
+          ? String(defaultHours)
+          : "",
+    );
     setActivityId(initial?.activityId ?? defaultActivityId(activities));
     setComments(initial?.comments ?? "");
     setFormError(null);

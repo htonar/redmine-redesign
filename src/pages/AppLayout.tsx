@@ -17,6 +17,8 @@ import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTimeEntryActivities } from "@/hooks/useTimeEntryActivities";
+import { useTimer } from "@/hooks/useTimer";
+import { TimerIndicator } from "@/components/time/TimerIndicator";
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   type NotificationSettings,
@@ -33,6 +35,16 @@ interface LayoutContext {
   /** Настройки уведомлений - персист на этом уровне, редактируются и из раздела «Настройки» (issue #45). */
   notificationSettings: NotificationSettings;
   setNotificationSettings: (next: NotificationSettings) => void;
+  /** Таймер учёта времени (issue #34) - управляется из карточки задачи. */
+  startTimer: (args: {
+    issueId: number;
+    issueSubject: string;
+    projectId: number | null;
+  }) => void;
+  stopTimer: () => void;
+  /** id задачи, по которой сейчас идёт таймер, либо null. */
+  activeTimerIssueId: number | null;
+  activeTimerElapsedMs: number;
 }
 
 function initials(firstname: string, lastname: string): string {
@@ -69,6 +81,27 @@ export function AppLayout() {
   const [isHotkeysHelpOpen, setIsHotkeysHelpOpen] = useState(false);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   const [isTrayLogTimeOpen, setIsTrayLogTimeOpen] = useState(false);
+
+  // Таймер учёта времени (issue #34) - глобальное состояние: индикатор в
+  // Topbar, стоп открывает предзаполненный LogTimeDialog.
+  const timer = useTimer(baseUrl, user?.id);
+  const [timerLogOpen, setTimerLogOpen] = useState(false);
+  const [timerLogInit, setTimerLogInit] = useState<{
+    issueId: number;
+    projectId: number | null;
+    hours: number;
+  } | null>(null);
+
+  function handleStopTimer() {
+    const result = timer.stop();
+    if (!result) return;
+    setTimerLogInit({
+      issueId: result.issueId,
+      projectId: result.projectId,
+      hours: result.hours,
+    });
+    setTimerLogOpen(true);
+  }
 
   // Тот же фильтр по add_issues, что и кнопка "Добавить задачу" на IssuesPage
   // (см. docs/permissions.md) - хоткей "c" не должен подсовывать проект без прав.
@@ -143,6 +176,16 @@ export function AppLayout() {
           onMarkAllRead: markAllRead,
           onOpenSettings: () => setIsNotificationSettingsOpen(true),
         }}
+        timerSlot={
+          timer.timer ? (
+            <TimerIndicator
+              timer={timer.timer}
+              elapsedMs={timer.elapsedMs}
+              onStop={handleStopTimer}
+              onCancel={timer.cancel}
+            />
+          ) : undefined
+        }
       >
         {/* key на путь - при переходе на другую страницу пойманная ошибка
             не "залипает" на исправно работающем разделе. */}
@@ -157,6 +200,10 @@ export function AppLayout() {
                 setSelectedProjectId,
                 notificationSettings,
                 setNotificationSettings,
+                startTimer: timer.start,
+                stopTimer: handleStopTimer,
+                activeTimerIssueId: timer.timer?.issueId ?? null,
+                activeTimerElapsedMs: timer.elapsedMs,
               } satisfies LayoutContext
             }
           />
@@ -185,6 +232,22 @@ export function AppLayout() {
         defaultProjectId={selectedProjectId}
         open={isTrayLogTimeOpen}
         onOpenChange={setIsTrayLogTimeOpen}
+        onSubmit={async (input) => {
+          if (!client) return;
+          await createTimeEntry(client, input);
+        }}
+      />
+      {/* Диалог логирования по остановке таймера (issue #34) - предзаполнен
+          задачей, проектом и наработанными часами. */}
+      <LogTimeDialog
+        client={client}
+        projects={loggableProjects}
+        activities={activities}
+        defaultIssueId={timerLogInit?.issueId}
+        defaultProjectId={timerLogInit?.projectId ?? selectedProjectId}
+        defaultHours={timerLogInit?.hours}
+        open={timerLogOpen}
+        onOpenChange={setTimerLogOpen}
         onSubmit={async (input) => {
           if (!client) return;
           await createTimeEntry(client, input);

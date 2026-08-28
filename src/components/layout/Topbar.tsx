@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Keyboard, Menu, Moon, Sun } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,6 +39,8 @@ export interface TopbarProps {
   notifications: NotificationsBellProps;
   /** Открыть выезжающий сайдбар на узких экранах (< lg). */
   onOpenNav?: () => void;
+  /** Индикатор активного таймера (issue #34) - рендерится, когда таймер запущен. */
+  timerSlot?: ReactNode;
 }
 
 /** Верхняя панель рабочей области: поиск, переключатель проекта, пользователь. */
@@ -54,6 +57,7 @@ export function Topbar({
   onShowHotkeysHelp,
   notifications,
   onOpenNav,
+  timerSlot,
 }: TopbarProps) {
   const navigate = useNavigate();
   const updater = useAppUpdater();
@@ -77,6 +81,8 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+        {timerSlot}
+
         <ProjectSwitcher
           projects={projects}
           loading={projectsLoading}

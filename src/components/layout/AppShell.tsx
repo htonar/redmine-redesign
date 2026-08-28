@@ -22,6 +22,7 @@ export function AppShell({
   onToggleTheme,
   onShowHotkeysHelp,
   notifications,
+  timerSlot,
 }: AppShellProps) {
   // Мобильный drawer сайдбара (< lg). На lg+ сайдбар всегда в потоке.
   const [navOpen, setNavOpen] = useState(false);
@@ -63,6 +64,7 @@ export function AppShell({
           onShowHotkeysHelp={onShowHotkeysHelp}
           notifications={notifications}
           onOpenNav={() => setNavOpen(true)}
+          timerSlot={timerSlot}
         />
         <main className="flex-1 overflow-auto bg-muted/40 p-4 sm:p-6">
           {children}
