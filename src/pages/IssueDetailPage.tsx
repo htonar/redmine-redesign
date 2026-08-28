@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type DragEvent as ReactDragEvent,
   type ReactNode,
 } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -314,6 +315,7 @@ export function IssueDetailPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
   const [removingAttachmentId, setRemovingAttachmentId] = useState<
@@ -532,13 +534,16 @@ export function IssueDetailPage() {
     }
   }
 
-  async function handleUploadFile(file: File) {
-    if (!client || !issue) return;
+  async function handleUploadFiles(files: File[]) {
+    if (!client || !issue || files.length === 0) return;
     setAttachmentError(null);
     setIsUploadingFile(true);
     try {
-      const uploaded = await uploadAttachment(client, file);
-      await updateIssue(client, issue.id, { uploads: [uploaded] });
+      const uploaded = [];
+      for (const file of files) {
+        uploaded.push(await uploadAttachment(client, file));
+      }
+      await updateIssue(client, issue.id, { uploads: uploaded });
       reload();
     } catch (e) {
       setAttachmentError(
@@ -550,10 +555,31 @@ export function IssueDetailPage() {
   }
 
   function handleFileInputChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     // Сбрасываем value - иначе повторный выбор того же файла не вызовет onChange.
     e.target.value = "";
-    if (file) void handleUploadFile(file);
+    void handleUploadFiles(files);
+  }
+
+  // #41 - drag-and-drop файлов на карточку. dragDepth: dragleave стреляет и
+  // при переходе на дочерний элемент, поэтому считаем вход/выход, а не
+  // просто toggle.
+  const dragDepthRef = useRef(0);
+  function handleDragEnter(e: ReactDragEvent) {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    dragDepthRef.current += 1;
+    setIsDraggingFiles(true);
+  }
+  function handleDragLeave() {
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDraggingFiles(false);
+  }
+  function handleDrop(e: ReactDragEvent) {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDraggingFiles(false);
+    void handleUploadFiles(Array.from(e.dataTransfer.files));
   }
 
   async function handleRemoveAttachment(attachmentId: number) {
@@ -751,7 +777,22 @@ export function IssueDetailPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      className="relative flex flex-col gap-4"
+      onDragEnter={handleDragEnter}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+      }}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingFiles && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/80 text-sm font-medium text-primary">
+          {isUploadingFile
+            ? "Загрузка..."
+            : "Отпустите файлы — прикрепим к задаче"}
+        </div>
+      )}
       <Button
         variant="ghost"
         size="sm"

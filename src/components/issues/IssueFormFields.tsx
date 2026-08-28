@@ -15,6 +15,7 @@ import type { ProjectMember } from "@/hooks/useProjectMembers";
 import type { ProjectCategory } from "@/hooks/useProjectCategories";
 import type { ProjectVersion } from "@/hooks/useProjectVersions";
 import { MarkdownEditor } from "@/components/markdown/MarkdownEditor";
+import { UserAvatar } from "@/components/UserAvatar";
 import type { UploadedFile } from "@/api/attachments";
 import type { RedmineClient } from "@/api/client";
 
@@ -310,7 +311,14 @@ export function IssueFormFields({
             <SelectItem value={UNASSIGNED}>Не назначен</SelectItem>
             {members.map((m) => (
               <SelectItem key={m.id} value={String(m.id)}>
-                {m.name}
+                <span className="flex items-center gap-2">
+                  <UserAvatar
+                    name={m.name}
+                    email={m.mail}
+                    className="size-5"
+                  />
+                  {m.name}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>

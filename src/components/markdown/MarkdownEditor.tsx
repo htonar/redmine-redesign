@@ -192,6 +192,14 @@ export function MarkdownEditor({
     void handleFiles(files);
   }
 
+  function handleDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void handleFiles(files);
+  }
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -248,6 +256,10 @@ export function MarkdownEditor({
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           onPaste={handlePaste}
+          onDrop={handleDrop}
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+          }}
           onKeyDown={(e) => {
             // e.code (физическая клавиша, не зависит от раскладки/языка
             // ввода) - в дополнение к e.key, на случай если на какой-то

@@ -12,6 +12,9 @@ export interface TimeEntryListFilters {
    * `m` - этот месяц. undefined - без ограничения по дате.
    */
   spentOn?: "t" | "w" | "m";
+  /** Явный диапазон дат YYYY-MM-DD (для произвольной недели, см. useWeeklyTimeDebt). */
+  from?: string;
+  to?: string;
 }
 
 export interface TimeEntryListParams extends TimeEntryListFilters {
@@ -49,6 +52,8 @@ export async function listTimeEntries(
         user_id: params.scope === "me" ? "me" : undefined,
         project_id: params.projectId ? String(params.projectId) : undefined,
         spent_on: params.spentOn,
+        from: params.from,
+        to: params.to,
       },
     },
   });

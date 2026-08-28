@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   DndContext,
@@ -27,6 +27,7 @@ import {
   sortStatusesByOrder,
   type KanbanColumnPrefs,
 } from "@/lib/kanban-columns";
+import { useListKeyboardNav } from "@/hooks/useListKeyboardNav";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU", {
@@ -39,6 +40,8 @@ interface KanbanCardProps {
   issue: IssueSummary;
   draggable: boolean;
   onOpen: () => void;
+  /** Подсвечена клавиатурной навигацией (issue #46). */
+  active?: boolean;
 }
 
 /**
@@ -47,20 +50,29 @@ interface KanbanCardProps {
  * конфликтуют (dnd-kit не может надежно отличить "чуть дрогнула рука при
  * клике" от намеренного драга без ручки, особенно на тачпаде).
  */
-function KanbanCard({ issue, draggable, onOpen }: KanbanCardProps) {
+function KanbanCard({ issue, draggable, onOpen, active }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: issue.id,
       disabled: !draggable,
     });
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (active) cardRef.current?.scrollIntoView({ block: "nearest" });
+  }, [active]);
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(el) => {
+        setNodeRef(el);
+        cardRef.current = el;
+      }}
       style={
         transform ? { transform: CSS.Translate.toString(transform) } : undefined
       }
       className={cn(
+        active && "ring-2 ring-primary",
         // animate-in fade-in-0 - карточка монтируется заново при
         // переключении на канбан-вид и при первой загрузке колонки; плавное
         // появление вместо "прыжка" (issue #9). motion-reduce - см.
@@ -119,6 +131,8 @@ interface KanbanColumnProps {
   issues: IssueSummary[];
   canEdit: boolean;
   onOpenIssue: (id: number) => void;
+  /** id карточки, подсвеченной клавиатурой (issue #46). */
+  activeIssueId?: number;
 }
 
 function KanbanColumn({
@@ -128,6 +142,7 @@ function KanbanColumn({
   issues,
   canEdit,
   onOpenIssue,
+  activeIssueId,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: statusId });
 
@@ -158,6 +173,7 @@ function KanbanColumn({
             key={issue.id}
             issue={issue}
             draggable={canEdit}
+            active={issue.id === activeIssueId}
             onOpen={() => onOpenIssue(issue.id)}
           />
         ))}
@@ -230,6 +246,16 @@ export function KanbanBoard({
     const hidden = new Set(columnPrefs.hidden);
     return issues.filter((i) => i.status && hidden.has(i.status.id)).length;
   }, [issues, columnPrefs.hidden]);
+
+  // j/k + Enter по карточкам (issue #46) - плоский порядок колонка за колонкой.
+  const flatIssues = useMemo(
+    () => columns.flatMap((c) => c.issues),
+    [columns],
+  );
+  const { index: navIndex } = useListKeyboardNav(flatIssues, (iss) =>
+    navigate(`/issues/${iss.id}`),
+  );
+  const activeIssueId = flatIssues[navIndex]?.id;
 
   function handleDragStart(event: DragStartEvent) {
     const issue = issues.find((i) => i.id === Number(event.active.id));
@@ -350,6 +376,7 @@ export function KanbanBoard({
               isClosed={status.isClosed}
               issues={columnIssues}
               canEdit={canEdit}
+              activeIssueId={activeIssueId}
               onOpenIssue={(id) => navigate(`/issues/${id}`)}
             />
           ))}

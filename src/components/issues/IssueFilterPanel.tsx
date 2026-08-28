@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   Popover,
   PopoverContent,
@@ -37,6 +38,8 @@ export const EMPTY_ADVANCED_FILTERS: AdvancedIssueFilters = {
 interface Option {
   id: number;
   name: string;
+  /** Только для авторов - email для Gravatar-аватарки (issue #44). */
+  mail?: string;
 }
 
 interface IssueFilterPanelProps {
@@ -86,6 +89,7 @@ export function IssueFilterPanel({
     field: "trackerId" | "priorityId" | "versionId" | "authorId",
     options: Option[],
     hint?: string,
+    withAvatar = false,
   ) => (
     <div className="flex flex-col gap-1.5">
       <Label>{label}</Label>
@@ -103,7 +107,18 @@ export function IssueFilterPanel({
           <SelectItem value={ANY}>Любой</SelectItem>
           {options.map((o) => (
             <SelectItem key={o.id} value={String(o.id)}>
-              {o.name}
+              {withAvatar ? (
+                <span className="flex items-center gap-2">
+                  <UserAvatar
+                    name={o.name}
+                    email={o.mail}
+                    className="size-5"
+                  />
+                  {o.name}
+                </span>
+              ) : (
+                o.name
+              )}
             </SelectItem>
           ))}
         </SelectContent>
@@ -159,7 +174,7 @@ export function IssueFilterPanel({
           {idSelect("Трекер", "trackerId", trackers)}
           {idSelect("Приоритет", "priorityId", priorities)}
           {idSelect("Версия", "versionId", versions, projectHint)}
-          {idSelect("Автор", "authorId", members, projectHint)}
+          {idSelect("Автор", "authorId", members, projectHint, true)}
         </div>
       </PopoverContent>
     </Popover>

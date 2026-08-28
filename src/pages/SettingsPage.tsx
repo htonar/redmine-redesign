@@ -27,6 +27,8 @@ import {
   saveAiSettings,
   type AiSettingsStored,
 } from "@/lib/ai-settings-storage";
+import { NotificationSettingsForm } from "@/components/layout/NotificationSettingsForm";
+import { useLayoutContext } from "./AppLayout";
 
 /**
  * Настройки приложения - всё, что хранится только в этом браузере
@@ -40,6 +42,7 @@ import {
  * (осознанное ограничение из грилинга).
  */
 export function SettingsPage() {
+  const { notificationSettings, setNotificationSettings } = useLayoutContext();
   const [tokens, setTokens] = useState<IntegrationTokens>(() => loadIntegrationTokens());
   const [isEditing, setIsEditing] = useState(false);
   const [values, setValues] = useState<IntegrationTokens>(tokens);
@@ -140,7 +143,7 @@ export function SettingsPage() {
   const branchRuleCount = Object.keys(branchCfg.typeMap).length;
 
   return (
-    <div className="flex max-w-xl flex-col gap-4">
+    <div className="grid max-w-4xl gap-4 lg:grid-cols-2 lg:items-start">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between border-b">
           <CardTitle>Интеграции</CardTitle>
@@ -381,6 +384,23 @@ export function SettingsPage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b">
+          <CardTitle>Уведомления</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">
+            Redmine не поддерживает push - приложение опрашивает его по
+            расписанию, пока вкладка открыта. Те же настройки доступны из
+            колокольчика в шапке.
+          </p>
+          <NotificationSettingsForm
+            settings={notificationSettings}
+            onChange={setNotificationSettings}
+          />
         </CardContent>
       </Card>
     </div>
