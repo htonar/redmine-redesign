@@ -4,12 +4,14 @@ import remarkGfm from "remark-gfm";
 import type { RedmineClient } from "@/api/client";
 import type { Attachment } from "@/api/attachments";
 import { Badge } from "@/components/ui/badge";
+import { CopyableImage } from "@/components/markdown/CopyableImage";
 import {
   useAttachmentMediaUrls,
   type ResolvedMedia,
 } from "@/components/markdown/useAttachmentMediaUrls";
 import { usePrMrStatuses } from "@/hooks/usePrMrStatuses";
 import { extractPrMrLinks } from "@/lib/pr-mr-links";
+import { htmlImagesToMarkdown } from "@/lib/html-images";
 import { parseImageTitle, textileImagesToMarkdown } from "@/lib/textile-images";
 import type { PrMrStatus } from "@/lib/pr-mr-status";
 import { cn } from "@/lib/utils";
@@ -83,10 +85,11 @@ export function MarkdownContent({
 
   if (!text.trim()) return null;
 
-  // Textile-картинки (`!name!`, `!{width: 680px}.name!`, ...) в тексте с
-  // инстансов на Textile-формате - переписываем в markdown, размер уезжает
-  // в title и разбирается в рендерере img/video ниже.
-  const rendered = textileImagesToMarkdown(text);
+  // Картинки, приехавшие не markdown-синтаксисом, переписываем в markdown
+  // перед рендером (размер уезжает в title, разбирается в рендерере img/video
+  // ниже): сырой HTML-тег `<img src=…>` (issue #67) и Textile-разметку
+  // (`!name!`, `!{width: 680px}.name!`, ...) с инстансов на Textile-формате.
+  const rendered = textileImagesToMarkdown(htmlImagesToMarkdown(text));
 
   return (
     <>
@@ -118,12 +121,12 @@ export function MarkdownContent({
                 return <audio src={hit.url} controls className="w-full" />;
               }
               return (
-                <img
-                  src={hit?.url ?? src}
+                <CopyableImage
+                  src={hit?.url ?? (typeof src === "string" ? src : "")}
                   alt={alt ?? ""}
                   title={realTitle}
                   style={dimStyle}
-                  className="rounded-lg border border-border"
+                  blob={hit?.blob}
                 />
               );
             },

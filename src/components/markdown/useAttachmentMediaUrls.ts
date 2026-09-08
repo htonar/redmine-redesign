@@ -7,6 +7,8 @@ export type MediaKind = "image" | "video" | "audio";
 export interface ResolvedMedia {
   url: string;
   kind: MediaKind;
+  /** Байты файла - для копирования картинки в буфер как изображения (issue #67). */
+  blob?: Blob;
 }
 
 /** Тип медиа по content_type вложения, либо null для не-медиа. */
@@ -64,9 +66,12 @@ export function useAttachmentMediaUrls(
             },
           );
           if (!data) return null;
-          const url = URL.createObjectURL(data as Blob);
+          const blob = data as Blob;
+          const url = URL.createObjectURL(blob);
           createdUrls.push(url);
-          return [a.filename, { url, kind }] as const;
+          const resolved: ResolvedMedia = { url, kind };
+          if (kind === "image") resolved.blob = blob;
+          return [a.filename, resolved] as [string, ResolvedMedia];
         } catch {
           return null;
         }
