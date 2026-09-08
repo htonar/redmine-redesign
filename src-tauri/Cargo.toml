@@ -45,3 +45,7 @@ tauri-plugin-notification = "2"
 # `<a target="_blank">` в Tauri webview его не открывает, нужен отдельный
 # плагин с shell-open командой.
 tauri-plugin-opener = "2"
+# Чтение картинки из системного буфера обмена (issue #67) - webview под
+# WebKitGTK не отдаёт вставленную картинку в ClipboardEvent, читаем её
+# напрямую через плагин.
+tauri-plugin-clipboard-manager = "2"

@@ -20,12 +20,14 @@ import {
 } from "@/components/markdown/useAttachmentMediaUrls";
 import { uploadAttachment, type UploadedFile } from "@/api/attachments";
 import type { RedmineClient } from "@/api/client";
+import { isTauri } from "@tauri-apps/api/core";
 import {
   extractClipboardFiles,
   GENERIC_PASTE_NAME,
   renameFile,
   uniquePasteName,
 } from "@/lib/clipboard-files";
+import { readTauriClipboardImage } from "@/lib/tauri-clipboard";
 import { cn } from "@/lib/utils";
 
 interface ToolbarAction {
@@ -187,9 +189,19 @@ export function MarkdownEditor({
     // Не только clipboardData.files: вставленная из буфера картинка приходит
     // в items как kind:"file", а files при этом пустой (см. extractClipboardFiles).
     const files = extractClipboardFiles(e.clipboardData);
-    if (files.length === 0) return;
-    e.preventDefault();
-    void handleFiles(files);
+    if (files.length > 0) {
+      e.preventDefault();
+      void handleFiles(files);
+      return;
+    }
+    // Десктоп-сборка (Tauri): картинку из системного буфера webview не кладёт
+    // в ClipboardEvent - читаем её отдельно через плагин (issue #67). preventDefault
+    // не зовём: если в буфере текст, вставка должна пройти как обычно.
+    if (isTauri()) {
+      void readTauriClipboardImage().then((file) => {
+        if (file) void handleFiles([file]);
+      });
+    }
   }
 
   function handleDrop(e: React.DragEvent<HTMLTextAreaElement>) {
