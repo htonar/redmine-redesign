@@ -73,6 +73,7 @@ import { BulkActionBar } from "@/components/issues/BulkActionBar";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { parseSort, toggleSort as toggleSortValue } from "@/lib/issue-sort";
 import { issueUrl } from "@/lib/redmine-url";
+import { isRowNavClick } from "@/lib/table-row-nav";
 import { openExternal } from "@/lib/open-external";
 import { cn } from "@/lib/utils";
 import { useListKeyboardNav } from "@/hooks/useListKeyboardNav";
@@ -487,7 +488,7 @@ export function IssuesPage() {
         return (
           <Link
             to={`/issues/${issue.id}`}
-            className="after:absolute after:inset-0 after:content-['']"
+            className="relative z-10 hover:underline"
             aria-label={`Открыть задачу #${issue.id}`}
           >
             #{issue.id}
@@ -895,6 +896,19 @@ export function IssuesPage() {
                   <TableRow
                     key={issue.id}
                     ref={i === navIndex ? setNavActiveRef : undefined}
+                    onClick={(e) => {
+                      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)
+                        return;
+                      if (
+                        !isRowNavClick(e.target, {
+                          hasTextSelection: Boolean(
+                            window.getSelection()?.toString(),
+                          ),
+                        })
+                      )
+                        return;
+                      navigate(`/issues/${issue.id}`);
+                    }}
                     // animate-in fade-in-0 - при смене фильтров новые
                     // issue.id монтируются как новые строки и плавно
                     // проявляются (issue #9, "переходы между состояниями
@@ -902,7 +916,7 @@ export function IssuesPage() {
                     // перемонтируются на каждый рендер, так что анимация не
                     // дёргается зря. motion-reduce - см. index.css.
                     className={cn(
-                      "relative cursor-pointer animate-in fade-in-0 duration-200 hover:bg-accent/50 motion-reduce:animate-none",
+                      "cursor-pointer animate-in fade-in-0 duration-200 hover:bg-accent/50 motion-reduce:animate-none",
                       i === navIndex && "bg-accent",
                       selectedIds.has(issue.id) && "bg-primary/5",
                     )}
