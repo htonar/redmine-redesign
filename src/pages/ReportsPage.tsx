@@ -21,6 +21,7 @@ import { issueIdsFromReport } from "@/lib/time-report";
 import { issueReportToCsv } from "@/lib/issue-report-csv";
 import { timeReportToCsv } from "@/lib/time-report-csv";
 import { statusBarClass } from "@/lib/issue-visuals";
+import { useStatusToneOverrides } from "@/contexts/StatusColorsContext";
 import { resolveReportPeriod, type ReportPeriodValue } from "@/lib/report-period";
 import { CSV_BOM } from "@/lib/csv";
 import { saveBlobAs } from "@/lib/save-file";
@@ -111,6 +112,7 @@ function timeRows(rows: TimeReportRow[], resolveLabel?: (r: TimeReportRow) => st
 export function ReportsPage() {
   const { client } = useAuth();
   const { selectedProjectId } = useLayoutContext();
+  const statusToneOverrides = useStatusToneOverrides();
   const [period, setPeriod] = useState<ReportPeriodValue>({ preset: "all" });
   const resolved = useMemo(() => resolveReportPeriod(period), [period]);
   const range = { from: resolved.from, to: resolved.to };
@@ -238,7 +240,10 @@ export function ReportsPage() {
                   <BreakdownCard
                     title="По статусу"
                     rows={bucketRows(issueReport.report.byStatus, (b) =>
-                      statusBarClass({ name: b.label, is_closed: b.isClosed }),
+                      statusBarClass(
+                        { name: b.label, is_closed: b.isClosed },
+                        statusToneOverrides,
+                      ),
                     )}
                   />
                   <BreakdownCard

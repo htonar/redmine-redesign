@@ -78,13 +78,24 @@ export interface StatusLike {
 }
 
 /**
- * Тон статуса: `is_closed` - основная ось (закрыт -> серый). Раскраска
- * открытых по названию - эвристика с нейтральным (info) фолбэком: неизвестное
- * имя не красится в неверный цвет, а просто остаётся нейтральным.
+ * Ручные тоны статусов (issue #65) - `нормализованное имя -> тон`. Задаются
+ * пользователем в «Настройки → Цвета статусов», перебивают эвристику по
+ * названию.
  */
-export function statusTone(status: StatusLike | undefined | null): Tone {
+export type StatusToneOverrides = Record<string, Tone>;
+
+/**
+ * Тон статуса: сначала ручной оверрайд по имени (issue #65), затем `is_closed`
+ * (закрыт -> серый) и эвристика по названию с нейтральным (info) фолбэком -
+ * неизвестное имя не красится в неверный цвет, а просто остаётся нейтральным.
+ */
+export function statusTone(
+  status: StatusLike | undefined | null,
+  overrides?: StatusToneOverrides,
+): Tone {
   if (!status) return "neutral";
   const n = (status.name ?? "").trim().toLowerCase();
+  if (overrides && n && overrides[n]) return overrides[n];
   if (/(rejected|отклонён|отклонен|отменён|отменен|canceled|cancelled)/.test(n))
     return "danger";
   if (/(resolved|closed|done|решён|решен|закрыт|выполнен)/.test(n)) {
@@ -133,8 +144,11 @@ export const TONE_BAR_CLASS: Record<Tone, string> = {
   danger: "bg-red-500",
 };
 
-export function statusBarClass(status: StatusLike | undefined | null): string {
-  return TONE_BAR_CLASS[statusTone(status)];
+export function statusBarClass(
+  status: StatusLike | undefined | null,
+  overrides?: StatusToneOverrides,
+): string {
+  return TONE_BAR_CLASS[statusTone(status, overrides)];
 }
 
 export function priorityTextClass(
@@ -151,8 +165,11 @@ export function priorityBadgeClass(
   return TONE_BADGE_CLASS[priorityTone(priority, ordered)];
 }
 
-export function statusBadgeClass(status: StatusLike | undefined | null): string {
-  return TONE_BADGE_CLASS[statusTone(status)];
+export function statusBadgeClass(
+  status: StatusLike | undefined | null,
+  overrides?: StatusToneOverrides,
+): string {
+  return TONE_BADGE_CLASS[statusTone(status, overrides)];
 }
 
 /**

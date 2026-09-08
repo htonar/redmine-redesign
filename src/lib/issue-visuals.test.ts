@@ -72,6 +72,23 @@ describe("statusTone", () => {
   it("new / прочее открытое -> info", () => {
     expect(statusTone({ name: "New", is_closed: false })).toBe("info");
   });
+
+  it("ручной оверрайд по имени перебивает эвристику (issue #65)", () => {
+    const overrides = { "заморожен": "info" as const, "new": "danger" as const };
+    expect(statusTone({ name: "Заморожен", is_closed: false }, overrides)).toBe(
+      "info",
+    );
+    // имя матчится без учёта регистра и пробелов
+    expect(statusTone({ name: "  NEW  ", is_closed: false }, overrides)).toBe(
+      "danger",
+    );
+  });
+
+  it("без совпадения в оверрайдах - обычная эвристика", () => {
+    expect(
+      statusTone({ name: "In Progress", is_closed: false }, { "прочее": "danger" }),
+    ).toBe("progress");
+  });
 });
 
 describe("dueDateState", () => {
