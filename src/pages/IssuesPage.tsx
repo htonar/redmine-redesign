@@ -90,6 +90,7 @@ import { useListColumnPrefs } from "@/hooks/useListColumnPrefs";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 import { isTauri } from "@tauri-apps/api/core";
 import type { IssueView } from "@/lib/issue-views-storage";
+import { useStatusToneOverrides } from "@/contexts/StatusColorsContext";
 import { useLayoutContext } from "./AppLayout";
 
 const DEFAULT_FILTERS: Pick<IssueListFilters, "assignee" | "status" | "sort"> =
@@ -139,6 +140,7 @@ export function IssuesPage() {
   const navigate = useNavigate();
   const { client, baseUrl, user, can } = useAuth();
   const { selectedProjectId, setSelectedProjectId } = useLayoutContext();
+  const statusToneOverrides = useStatusToneOverrides();
   const [persistedFilters, setPersistedFilters] = usePersistedState<PersistedIssueFilters>(
     baseUrl,
     user?.id,
@@ -419,7 +421,10 @@ export function IssuesPage() {
     }
     return (
       issue.status && (
-        <Badge variant="outline" className={statusBadgeClass(issue.status)}>
+        <Badge
+          variant="outline"
+          className={statusBadgeClass(issue.status, statusToneOverrides)}
+        >
           {issue.status.name}
         </Badge>
       )
@@ -821,6 +826,7 @@ export function IssuesPage() {
             assignee={assignee}
             canEdit={can("edit_issues", selectedProjectId)}
             columnPrefs={kanbanColumnPrefs}
+            statusToneOverrides={statusToneOverrides}
           />
         ))}
 

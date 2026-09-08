@@ -32,6 +32,7 @@ import {
   priorityBadgeClass,
   statusBadgeClass,
   type OrderedPriority,
+  type StatusToneOverrides,
 } from "@/lib/issue-visuals";
 import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
@@ -151,6 +152,8 @@ interface KanbanColumnProps {
   /** id карточки, подсвеченной клавиатурой (issue #46). */
   activeIssueId?: number;
   priorityOrder?: OrderedPriority[];
+  /** Ручные тоны статусов (issue #65). */
+  statusToneOverrides?: StatusToneOverrides;
 }
 
 function KanbanColumn({
@@ -162,6 +165,7 @@ function KanbanColumn({
   onOpenIssue,
   activeIssueId,
   priorityOrder,
+  statusToneOverrides,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: statusId });
 
@@ -177,7 +181,10 @@ function KanbanColumn({
         <div className="flex items-center gap-1.5">
           <Badge
             variant="outline"
-            className={statusBadgeClass({ name: title, is_closed: isClosed })}
+            className={statusBadgeClass(
+              { name: title, is_closed: isClosed },
+              statusToneOverrides,
+            )}
           >
             {title}
           </Badge>
@@ -219,6 +226,8 @@ export interface KanbanBoardProps {
   canEdit: boolean;
   /** Какие статус-колонки показывать и в каком порядке (см. useKanbanColumnPrefs). */
   columnPrefs: KanbanColumnPrefs;
+  /** Ручные тоны статусов (issue #65) - из StatusColorsContext. */
+  statusToneOverrides?: StatusToneOverrides;
 }
 
 /**
@@ -237,6 +246,7 @@ export function KanbanBoard({
   assignee,
   canEdit,
   columnPrefs,
+  statusToneOverrides,
 }: KanbanBoardProps) {
   const navigate = useNavigate();
   const { statuses, isLoading: statusesLoading } = useIssueStatuses(client);
@@ -409,6 +419,7 @@ export function KanbanBoard({
               activeIssueId={activeIssueId}
               onOpenIssue={(id) => navigate(`/issues/${id}`)}
               priorityOrder={priorityOrder}
+              statusToneOverrides={statusToneOverrides}
             />
           ))}
         </div>

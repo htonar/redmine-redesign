@@ -28,6 +28,7 @@ import {
   type AiSettingsStored,
 } from "@/lib/ai-settings-storage";
 import { NotificationSettingsForm } from "@/components/layout/NotificationSettingsForm";
+import { StatusColorsCard } from "@/components/settings/StatusColorsCard";
 import { useLayoutContext } from "./AppLayout";
 
 /**
@@ -403,6 +404,8 @@ export function SettingsPage() {
           />
         </CardContent>
       </Card>
+
+      <StatusColorsCard />
     </div>
   );
 }

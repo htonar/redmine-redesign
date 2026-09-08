@@ -92,7 +92,12 @@ import {
   RELATION_TYPE_OPTIONS,
   describeIssueRelation,
 } from "@/lib/issue-relations";
-import { dueDateState, priorityBadgeClass } from "@/lib/issue-visuals";
+import {
+  dueDateState,
+  priorityBadgeClass,
+  statusBadgeClass,
+} from "@/lib/issue-visuals";
+import { useStatusToneOverrides } from "@/contexts/StatusColorsContext";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 import { formatDuration } from "@/lib/format-duration";
 import { useLayoutContext } from "./AppLayout";
@@ -183,6 +188,7 @@ export function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { client, can, user, baseUrl } = useAuth();
+  const statusToneOverrides = useStatusToneOverrides();
   const { startTimer, stopTimer, activeTimerIssueId, activeTimerElapsedMs } =
     useLayoutContext();
   const { projects } = useProjects(client);
@@ -1047,7 +1053,12 @@ export function IssueDetailPage() {
                   onValueChange={handleStatusChange}
                   disabled={isSavingStatus}
                 >
-                  <SelectTrigger className="w-40 sm:w-44">
+                  <SelectTrigger
+                    className={cn(
+                      "w-40 sm:w-44",
+                      statusBadgeClass(issue.status, statusToneOverrides),
+                    )}
+                  >
                     <SelectValue placeholder="Статус" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1061,7 +1072,11 @@ export function IssueDetailPage() {
               ) : (
                 issue.status && (
                   <Badge
-                    variant={issue.status.is_closed ? "secondary" : "default"}
+                    variant="outline"
+                    className={statusBadgeClass(
+                      issue.status,
+                      statusToneOverrides,
+                    )}
                   >
                     {issue.status.name}
                   </Badge>

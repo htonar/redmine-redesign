@@ -28,6 +28,7 @@ import { useIssuePriorities } from "@/hooks/useIssuePriorities";
 import { useTrackers } from "@/hooks/useTrackers";
 import type { JournalValueMaps } from "@/lib/journal-format";
 import { statusBadgeClass } from "@/lib/issue-visuals";
+import { useStatusToneOverrides } from "@/contexts/StatusColorsContext";
 import { formatRelativeTime, fullTimestamp } from "@/lib/relative-time";
 import { useLayoutContext } from "./AppLayout";
 
@@ -46,6 +47,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { client, can, user } = useAuth();
   const { selectedProjectId } = useLayoutContext();
+  const statusToneOverrides = useStatusToneOverrides();
   const [counts, setCounts] = useState<Counts | null>(null);
   const [recent, setRecent] = useState<IssueSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -219,7 +221,10 @@ export function DashboardPage() {
                       {issue.status && (
                         <Badge
                           variant="outline"
-                          className={statusBadgeClass(issue.status)}
+                          className={statusBadgeClass(
+                            issue.status,
+                            statusToneOverrides,
+                          )}
                         >
                           {issue.status.name}
                         </Badge>

@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { StatusColorsProvider } from "@/contexts/StatusColorsContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LoginPage } from "@/pages/LoginPage";
 import { AppLayout } from "@/pages/AppLayout";
@@ -29,25 +30,27 @@ function AppGate() {
   }
 
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        <Route index element={<Navigate to="/issues" replace />} />
-        <Route path="/issues" element={<IssuesPage />} />
-        <Route path="/issues/:id" element={<IssueDetailPage />} />
-        <Route path="/time" element={<TimeTrackingPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/files" element={<FilesPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route
-          path="/integrations"
-          element={<Navigate to="/settings" replace />}
-        />
-        <Route path="*" element={<Navigate to="/issues" replace />} />
-      </Route>
-    </Routes>
+    <StatusColorsProvider>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<Navigate to="/issues" replace />} />
+          <Route path="/issues" element={<IssuesPage />} />
+          <Route path="/issues/:id" element={<IssueDetailPage />} />
+          <Route path="/time" element={<TimeTrackingPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/files" element={<FilesPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route
+            path="/integrations"
+            element={<Navigate to="/settings" replace />}
+          />
+          <Route path="*" element={<Navigate to="/issues" replace />} />
+        </Route>
+      </Routes>
+    </StatusColorsProvider>
   );
 }
 
