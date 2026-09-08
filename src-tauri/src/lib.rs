@@ -21,6 +21,10 @@ pub fn run() {
     // Открытие ссылок ("Открыть в Redmine") в системном браузере, а не
     // внутри webview - GitHub issue #24.
     .plugin(tauri_plugin_opener::init())
+    // Чтение картинки из системного буфера при вставке в редактор описания/
+    // комментария - webview под WebKitGTK не отдаёт её в ClipboardEvent
+    // (GitHub issue #67).
+    .plugin(tauri_plugin_clipboard_manager::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

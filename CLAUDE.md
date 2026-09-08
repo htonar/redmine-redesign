@@ -175,6 +175,17 @@ UI/UX оригинального Redmine (лишь бы оставаться в 
   тоже без Node-прокси.
 - Кроссплатформенность: `reqwest` с `rustls-tls` (без системной OpenSSL),
   `tauri.conf.json` → `bundle.targets: "all"` (nsis для Windows и т.д.).
+- **Вставка/перетаскивание картинок в редактор** (issue #67): webview под
+  WebKitGTK не кладёт вставленную из системного буфера картинку в
+  `ClipboardEvent` (`clipboardData` пустой). В десктоп-режиме
+  `MarkdownEditor` читает картинку отдельно - `readTauriClipboardImage`
+  (`src/lib/tauri-clipboard.ts`) через `tauri-plugin-clipboard-manager`
+  (`readImage()` → RGBA → PNG через canvas → `File`), дальше тот же
+  `handleFiles`, что и в вебе. Пермишен - `clipboard-manager:allow-read-image`.
+  Drag-and-drop файлов включён через `app.windows[].dragDropEnabled: false`
+  в `tauri.conf.json` - иначе Tauri перехватывает нативный drop и HTML5
+  `ondrop` в webview не срабатывает; с флагом работает существующий
+  `handleDrop`.
 - **GitHub Actions** (`.github/workflows/desktop-release.yml`) - матрица
   win/macOS/linux через `tauri-apps/tauri-action`, **только ручной запуск**
   (`workflow_dispatch`), версия - обязательный ручной ввод (semver,
